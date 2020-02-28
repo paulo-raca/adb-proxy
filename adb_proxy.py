@@ -160,7 +160,7 @@ class AdbProxy:
 
     async def reverse_create(self, remote, local, local_id, remote_id):
         async def on_connected(r, w):
-            logger.info(f"Received a reverse connection!")
+            logger.info(f"Received a reverse connection! {local} -> {proxy} -> {remote}")
 
             stream_id = self.next_local_id
             self.next_local_id += 1
@@ -174,13 +174,13 @@ class AdbProxy:
         proxy = f"tcp:{int(port)}"
         cmd = f"reverse:forward:{remote};{proxy}"
 
-        ret = await read_stream(cmd)
+        ret = await self.read_stream(cmd)
 
         if ret.startswith(b"OKAY"):
             port = ret[8:]
             if (port):
                 remote = f"tcp:{int(port)}"
-            logger.info(f"Created reverse tunnel {remote} -> {proxy} -> {local}  -- {ret}")
+            logger.info(f"Created reverse tunnel {remote} -> {proxy} -> {local}")
             old_listener = self.reverse_listeners.pop(remote, None)
             if old_listener:
                 logger.info(f"Closing previous reverse tunnel to {remote}: {old_listener}")
@@ -483,11 +483,11 @@ async def main():
     parser_connect_client.add_argument("-J", "--ssh-tunnel", action="append", type=ssh_config, help="Add a SSH jump host to access the device ADB server")
 
     parser_listen_reverse = subparsers.add_parser('listen-reverse', help='Awaits reverse connections from devices')
-    parser_listen_reverse.add_argument("server-address", type=ssh_config, default={}, help="Server address where the reverse SSH server will be bound")
+    parser_listen_reverse.add_argument("server-address", type=ssh_config, nargs='?', default={}, help="Server address where the reverse SSH server will be bound")
     parser_listen_reverse.add_argument("-J", "--ssh-tunnel", action="append", type=ssh_config, help="Add a SSH jump host to access the device ADB server")
 
     parser_connect_reverse = subparsers.add_parser('connect-reverse', help='Creates a reverse connection to a remote ADB server')
-    parser_connect_reverse.add_argument("server-address", type=ssh_config, default={}, help="Address that the remote ADB is listening on")
+    parser_connect_reverse.add_argument("server-address", type=ssh_config, nargs='?', default={}, help="Address that the remote ADB is listening on")
     parser_connect_reverse.add_argument("-s", "--serial", help="Device serial number")
     parser_connect_reverse.add_argument("-r", "--device-server", type=sockaddr, default=("localhost", 5037), help="Socket address of device ADB server")
     parser_connect_reverse.add_argument("-J", "--ssh-tunnel", action="append", type=ssh_config, help="Add a SSH jump host to access the device ADB server")
