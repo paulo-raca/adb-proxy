@@ -106,6 +106,7 @@ class AdbProxyChannel:
             self.writer.close()
             if kill_sink:
                 self.sink_task.cancel()
+                await self.sink_task
             if send_close_cmd:
                 await self.adb_device.send_cmd(b'CLSE', self.local_id, self.remote_id)
         await close_and_wait(self.writer)
@@ -335,13 +336,13 @@ class AdbProxy:
                     close_and_wait(old_listener)
                     for old_listener in self.reverse_listeners.values()
                 ])
-
             if self.streams:
                 await asyncio.wait([
                     stream.close(send_close_cmd=False, quiet=True)
                     for stream in self.streams.values()
                 ])
             await close_and_wait(self.writer)
+
 
     @staticmethod
     async def attach_raw(connect_to_device, listen_from_device, device_id):
@@ -377,48 +378,113 @@ class AdbProxy:
             except:
                 pass
 
-    @staticmethod
-    async def attach(device_id, device_adb_addr=("localhost", 5037), ssh_tunnels=[], ssh_client=None, ssh_reverse_tunnel=None):
-        if ssh_reverse_tunnel:
-            class MySSHClient(asyncssh.SSHClient):
-                def connection_made(self, conn):
-                    self.conn = conn
-                def auth_banner_received(self, msg, lang):
-                    self.conn.set_extra_info(device_id=msg)
 
-            async def on_connected(ssh_client):
-                device_id = ssh_client.get_extra_info('device_id') or device_id
-                print(f"Got a reverse-ssh connection!")
-                asyncio.create_task(AdbProxy.attach(device_id, device_adb_addr, ssh_tunnels, ssh_client))
+async def attach(device_id, device_adb_addr=("localhost", 5037), ssh_tunnels=[], ssh_client=None):
+    if ssh_tunnels:
+        async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
+            logger.info(f"Jumping through SSH proxy: {ssh_tunnels[0]}")
+            return await attach(device_id, device_adb_addr, ssh_tunnels[1:], ssh_client)
 
-            server = await asyncssh.listen_reverse(client_factory=MySSHClient, acceptor=on_connected, host=ssh_reverse_tunnel[0], port=ssh_reverse_tunnel[1], username="JohnSmith", known_hosts=None)
-            async with server:
-                port = server.sockets[0].getsockname()[1]
-                print(f"Reverse SSH listening: {ssh_reverse_tunnel[0]}:{port}")
-                await asyncio.Semaphore(0).acquire()
+    if ssh_client:
+        async def connect_to_device():
+            return await ssh_client.open_connection(remote_host=device_adb_addr[0], remote_port=device_adb_addr[1])
+        async def listen_from_device(on_connected):
+            server = await ssh_client.start_server(lambda *args: on_connected, listen_host='localhost', listen_port=0)
+            port = server.get_port()
+            return server, port
+    else:
+        async def connect_to_device():
+            return await asyncio.open_connection(*device_adb_addr)
+        async def listen_from_device(on_connected):
+            server = await asyncio.start_server(on_connected, "localhost", 0)
+            port = server.sockets[0].getsockname()[1]
+            return server, port
+    logger.info(f"Connecting to {device_adb_addr[0]}:{device_adb_addr[1]}...")
+    return await AdbProxy.attach_raw(connect_to_device, listen_from_device, device_id)
 
-        if ssh_tunnels:
-            async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
-                print(f"SSH bridge Connected: {ssh_tunnels[0]}")
-                return await AdbProxy.attach(device_id, device_adb_addr, ssh_tunnels[1:], ssh_client)
 
-        if ssh_client:
-            async def connect_to_device():
-                return await ssh_client.open_connection(remote_host=device_adb_addr[0], remote_port=device_adb_addr[1])
-            async def listen_from_device(on_connected):
-                server = await ssh_client.start_server(lambda *args: on_connected, listen_host='localhost', listen_port=0)
-                port = server.get_port()
-                return server, port
-        else:
-            async def connect_to_device():
-                return await asyncio.open_connection(*device_adb_addr)
-            async def listen_from_device(on_connected):
-                server = await asyncio.start_server(on_connected, "localhost", 0)
-                port = server.sockets[0].getsockname()[1]
-                return server, port
-        print(f"Connecting: {device_adb_addr}")
-        return await AdbProxy.attach_raw(connect_to_device, listen_from_device, device_id)
+async def listen_reverse(server_config, ssh_tunnels=[], ssh_client=None):
+    if ssh_tunnels:
+        async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
+            logger.info(f"Jumping through SSH proxy: {ssh_tunnels[0]}")
+            return await listen_reverse(server_config, ssh_tunnels[1:], ssh_client)
 
+    server_config.setdefault("username", "adb-proxy")
+    server_config.setdefault("host", "localhost")
+    server_config.setdefault("port", 0)
+    server_config.setdefault("known_hosts", None)
+
+    class MySSHClient(asyncssh.SSHClient):
+        def connection_made(self, conn):
+            self.conn = conn
+        def auth_banner_received(self, msg, lang):
+            self.conn.set_extra_info(attach_opts=json.loads(msg))
+
+    async def on_connected(ssh_client):
+        attach_opts = ssh_client.get_extra_info('attach_opts')
+        logger.info(f"Reverse connection received")
+        async with ssh_client:
+            await attach(ssh_client=ssh_client, **attach_opts)
+
+    server = await asyncssh.listen_reverse(
+            tunnel = ssh_client,
+            client_factory = MySSHClient,
+            acceptor = on_connected,
+            **server_config)
+    async with server:
+        try:
+            socket_addr = server.sockets[0].getsockname()
+        except:
+            socket_addr = (server_config["host"], server.get_port())
+        logger.info(f"Listening for reverse connections: {server_config['username']}@{socket_addr[0]}:{socket_addr[1]}")
+        await asyncio.Semaphore(0).acquire()
+
+
+async def connect_reverse(server_config, device_id, device_adb_addr=("localhost", 5037), ssh_tunnels=[], ssh_client=None):
+    if ssh_tunnels:
+        async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
+            logger.info(f"Jumping through SSH proxy: {ssh_tunnels[0]}")
+            return await connect_reverse(server_config, device_id, device_adb_addr, ssh_tunnels[1:], ssh_client)
+
+    server_config.setdefault("username", "adb-proxy")
+    server_config.setdefault("host", "localhost")
+    server_config.setdefault("port", 22)
+
+    class MySSHServer(asyncssh.SSHServer):
+        def connection_made(self, conn):
+            conn.send_auth_banner(json.dumps(dict(
+                device_id = device_id,
+                device_adb_addr = device_adb_addr,
+                ssh_tunnels = ssh_tunnels
+            )))
+
+        def begin_auth(self, username):
+            if username != server_config["username"]:
+                logger.info(f"Authenticating with {username}: Denied")
+                return True
+            else:
+                logger.info(f"Authenticating with {username}: Accepted")
+                return False
+
+        def server_requested(self, listen_host, listen_port):
+            logger.info(f"Creating tunnel from {listen_host}:{listen_port}")
+            return True
+
+        def connection_requested(self, dest_host, dest_port, orig_host, orig_port):
+            logger.info(f"Incoming connection to {dest_host}:{dest_port}")
+            return True
+
+    server_host_key = asyncssh.generate_private_key("ssh-rsa")
+    ssh_server = await asyncssh.connect_reverse(
+            server_factory = MySSHServer,
+            tunnel = ssh_client,
+            host = server_config["host"],
+            port = server_config["port"],
+            server_host_keys = [server_host_key])
+
+    async with ssh_server:
+        logger.info(f"Client connected!")
+        await ssh_server.wait_closed()
 
 
 async def check_call(program, *args, **kwargs):
@@ -431,21 +497,7 @@ async def close_and_wait(x):
     x.close()
     await x.wait_closed()
 
-async def main_task(device_id, device_adb_addr, ssh_tunnels, ssh_reverse_tunnel):
-    await AdbProxy.attach(device_id, device_adb_addr, ssh_tunnels, None, ssh_reverse_tunnel)
 
-
-def run_loop(task):
-    task = asyncio.ensure_future(task)
-    def signal_handler(sig, frame):
-        task.cancel()
-    signal.signal(signal.SIGINT, signal_handler)
-
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(task)
-    except asyncio.CancelledError:
-        pass
 
 
 def sockaddr(addr):
@@ -464,17 +516,75 @@ def ssh_config(config):
     ret["host"] = config
     return ret
 
+async def main():
+    parser = argparse.ArgumentParser(description="Creates ADB Proxy connections")
+    subparsers = parser.add_subparsers(help='commands')
 
+    parser_connect_client = subparsers.add_parser('connect', help='Makes a direct connection to the device ADB')
+    parser_connect_client .set_defaults(cmd='connect')
+    parser_connect_client.add_argument("-s", "--serial", required=True, help="Device serial number")
+    parser_connect_client.add_argument("-r", "--device-server", type=sockaddr, default=("localhost", 5037), help="Socket address of device ADB server")
+    parser_connect_client.add_argument("-J", "--ssh-tunnel", action="append", type=ssh_config, help="Add a SSH jump host to access the device ADB server")
 
-parser = argparse.ArgumentParser(description="Manage DeviceFarm jobs")
-parser.add_argument("-s", "--serial", required=True, help="Remote device serial number")
-parser.add_argument("-r", "--remote-server", type=sockaddr, default=("localhost", 5037), help="Remote ADB Server")
-parser.add_argument("-l", "--local-server", type=sockaddr, default=("localhost", 5037), help="Local ADB Server")
-parser.add_argument("--ssh-reverse-tunnel", type=sockaddr, help="Binds as a reverse SSH client")
-parser.add_argument("--ssh-tunnel", action="append", type=ssh_config, help="List of SSH tunnels that the connection must go through")
+    parser_listen_reverse = subparsers.add_parser('listen-reverse', help='Awaits reverse connections from devices')
+    parser_listen_reverse.set_defaults(cmd='listen-reverse')
+    parser_listen_reverse.add_argument("server-address", type=ssh_config, default={}, help="Server address where the reverse SSH server will be bound")
+    parser_listen_reverse.add_argument("-J", "--ssh-tunnel", action="append", type=ssh_config, help="Add a SSH jump host to access the device ADB server")
 
-argcomplete.autocomplete(parser)
-args = parser.parse_args()
+    parser_connect_reverse = subparsers.add_parser('connect-reverse', help='Creates a reverse connection to a remote ADB server')
+    parser_connect_reverse.set_defaults(cmd='connect-reverse')
+    parser_connect_reverse.add_argument("server-address", type=ssh_config, default={}, help="Address that the remote ADB is listening on")
+    parser_connect_reverse.add_argument("-s", "--serial", required=True, help="Device serial number")
+    parser_connect_reverse.add_argument("-r", "--device-server", type=sockaddr, default=("localhost", 5037), help="Socket address of device ADB server")
+    parser_connect_reverse.add_argument("-J", "--ssh-tunnel", action="append", type=ssh_config, help="Add a SSH jump host to access the device ADB server")
 
-run_loop(main_task(device_id=args.serial, device_adb_addr=args.remote_server, ssh_tunnels=args.ssh_tunnel, ssh_reverse_tunnel=args.ssh_reverse_tunnel))
+    argcomplete.autocomplete(parser)
+    args = parser.parse_args()
 
+    if args.cmd == 'connect':
+        await attach(
+                device_id = args.serial,
+                device_adb_addr = args.device_server,
+                ssh_tunnels = args.ssh_tunnel)
+
+    elif args.cmd == 'listen-reverse':
+        await(listen_reverse(
+                server_config = getattr(args, "server-address"),
+                ssh_tunnels = args.ssh_tunnel))
+
+    elif args.cmd == 'connect-reverse':
+        await(connect_reverse(
+                server_config = getattr(args, "server-address"),
+                device_id = args.serial,
+                device_adb_addr = args.device_server,
+                ssh_tunnels = args.ssh_tunnel))
+
+if __name__ == "__main__":
+    async def ignore_cancel(task):
+        try:
+            await task
+        except asyncio.CancelledError:
+            logger.warning("Cancelled")
+
+        #current_task = asyncio.current_task()
+        #while True:
+            #pending_tasks = [
+                #task
+                #for task in asyncio.Task.all_tasks()
+                #if task != current_task
+            #]
+            #print("Pending tasks:", len(pending_tasks))
+            #if not pending_tasks:
+                #break
+
+            #for task in pending_tasks:
+                #print("Waiting for task:", task, id(task))
+                #await task
+                #await asyncio.sleep(1)
+
+    task = asyncio.ensure_future(ignore_cancel(main()))
+
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal.SIGINT, task.cancel)
+
+    asyncio.get_event_loop().run_until_complete(task)
