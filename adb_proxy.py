@@ -31,7 +31,7 @@ import signal
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('adb-proxy')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 class AdbProxyChannel:
@@ -116,8 +116,9 @@ class AdbProxy:
     """
     This represents a proxy connected to the local ADB server
     """
-    def __init__(self, reader, writer, connect_to_device, device_id, device_name):
+    def __init__(self, reader, writer, connect_to_device, listen_from_device, device_id, device_name):
         self.connect_to_device = connect_to_device
+        self.listen_from_device = listen_from_device
         self.device_id = device_id
         self.device_name = device_name
         self.protocol_version = 0x1000001
@@ -126,6 +127,7 @@ class AdbProxy:
         self.reader = reader
         self.writer = writer
         self.streams = {}
+        self.reverse_listeners = {}
         self.next_local_id = 1
 
     async def send_cmd(self, cmd, arg0, arg1, data=b''):
@@ -153,18 +155,92 @@ class AdbProxy:
         logger.debug(f"Recv {header_blob[:4]}, arg0={arg0}, arg1={arg1}, data={data}")
         return header_blob[:4], arg0, arg1, data
 
-    async def get_prop(self, prop):
-        """ Uses `getprop` shell command to get info from the device """
-        reader, writer = await AdbProxy.open_stream(self.connect_to_device, self.device_id, f"shell:getprop {prop}\x00")
-        try:
-            return (await reader.read()).decode("utf-8").strip()
-        finally:
-            writer.close()
-            await writer.wait_closed()
+    async def reverse_create(self, remote, local, local_id, remote_id):
+        async def on_connected(r, w):
+            logger.info(f"Received a reverse connection!")
+
+            stream_id = self.next_local_id
+            self.next_local_id += 1
+            self.streams[stream_id] = AdbProxyChannel(self, f"reverse-proxy:{local}", stream_id, 0, r, w)
+
+            logger.info(f"Sending open")
+            await self.send_cmd(b"OPEN", stream_id, 0, local.encode('utf-8'))
+            logger.info(f"open sent")
+
+        listener, port = await self.listen_from_device(on_connected)
+        proxy = f"tcp:{int(port)}"
+        cmd = f"reverse:forward:{remote};{proxy}"
+
+        ret = await self.read_channel(cmd)
+
+        if ret.startswith(b"OKAY"):
+            port = ret[8:]
+            if (port):
+                remote = f"tcp:{int(port)}"
+            logger.info(f"Created reverse tunnel {remote} -> {proxy} -> {local}  -- {ret}")
+            old_listener = self.reverse_listeners.pop(remote, None)
+            if old_listener:
+                logger.info(f"Closing previous reverse tunnel to {remote}: {old_listener}")
+                old_listener.close()
+                await old_listener.wait_closed()
+            self.reverse_listeners[remote] = listener
+        else:
+            logger.warning(f"Failed to create reverse tunnel {remote} -> {proxy} -> {local}  -- {ret}")
+            listener.close()
+            await listener.wait_closed()
+
+        await self.send_cmd(b'OKAY', local_id, remote_id)
+        await self.send_cmd(b'WRTE', local_id, remote_id, ret)
+        await self.send_cmd(b'CLSE', local_id, remote_id)
+
+    async def reverse_remove(self, remote, local_id, remote_id):
+        cmd = f"reverse:killforward:{remote}"
+        ret = await self.read_channel(cmd)
+
+        if ret.startswith(b"OKAY"):
+            old_listener = self.reverse_listeners.pop(remote, None)
+            if old_listener:
+                logger.info(f"Closing reverse tunnel to {remote}: {old_listener}")
+                old_listener.close()
+                await old_listener.wait_closed()
+
+        await self.send_cmd(b'OKAY', local_id, remote_id)
+        await self.send_cmd(b'WRTE', local_id, remote_id, ret)
+        await self.send_cmd(b'CLSE', local_id, remote_id)
+
+    async def reverse_remove_all(self, local_id, remote_id):
+        for remote, old_listener in self.reverse_listeners.items():
+            logger.info(f"Closing reverse tunnel to {remote}: {old_listener}")
+            old_listener.close()
+            await old_listener.wait_closed()
+        self.reverse_listeners.clear()
+
+        await self.send_cmd(b'OKAY', local_id, remote_id)
+        await self.send_cmd(b'WRTE', local_id, remote_id, b"OKAY")
+        await self.send_cmd(b'CLSE', local_id, remote_id)
 
     async def open_channel(self, name, local_id, remote_id):
         """ Open a channel to the device and register it with the specified ID """
+        logger.info(f"open_channel: {repr(name)}")
+
         try:
+            # Special case: "reverse" -- We need to open a server socket on the device remote and use it as a proxy
+            # reverse:forward:tcp:6100;tcp:7100
+            # reverse:killforward:tcp:6100
+            # reverse:killforward-all
+            # reverse:list-forward
+            if name.startswith("reverse:forward:"):
+                remote, local = name[len("reverse:forward:"):].split(";")
+                return await self.reverse_create(remote, local, local_id, remote_id)
+            elif name.startswith("reverse:killforward:"):
+                remote = name[len("reverse:killforward:"):]
+                return await self.reverse_remove(remote, local_id, remote_id)
+            elif name == "reverse:killforward-all":
+                return await self.reverse_remove_all(local_id, remote_id)
+            # TODO: elif name == "reverse:list-forward":
+            elif name.startswith("reverse:"):
+                raise Exception(f"Unsupported reverse proxy command: {repr(name)}")
+
             reader, writer = await AdbProxy.open_stream(self.connect_to_device, self.device_id, name)
             logger.info(f"{local_id}[{name}] opened")
 
@@ -176,6 +252,15 @@ class AdbProxy:
         except Exception as e:
             logger.warning(f"{local_id}[{name}] failed to open -- {e}")
             await self.send_cmd(b'CLSE', 0, remote_id)  # Failed to open stream
+
+    async def read_channel(self, name):
+        """ Open a stream to the device, read its contents and close """
+        reader, writer = await AdbProxy.open_stream(self.connect_to_device, self.device_id, name)
+        try:
+            return await reader.read()
+        finally:
+            writer.close()
+            await writer.wait_closed()
 
     @staticmethod
     async def open_stream(connect_to_device, device_id, name):
@@ -191,9 +276,11 @@ class AdbProxy:
             status = (await reader.readexactly(4)).decode('utf-8')
             if status != 'OKAY':
                 writer.close()
-                error = (await reader.read()).decode('utf-8')
+                error = (await reader.read()).decode('utf-8')[4:]
                 raise Exception(f"Cannot open '{name}': {status} -- {error}")
         return reader, writer
+
+
 
     async def go(self):
         """ Main method, executes the proxying between local server and remote device """
@@ -217,7 +304,7 @@ class AdbProxy:
                 if cmd == b"OPEN":
                     remote_id = arg0
                     local_id = self.next_local_id
-                    name = data.decode("utf-8")
+                    name = data.decode("utf-8")[:-1]
                     self.next_local_id += 1
                     asyncio.create_task(self.open_channel(name, local_id, remote_id))
 
@@ -233,6 +320,7 @@ class AdbProxy:
                     local_id = arg1
                     stream = self.streams.get(local_id, None)
                     if stream is not None:
+                        stream.remote_id = remote_id
                         asyncio.create_task(stream.ready())
 
                 elif cmd == b"WRTE":
@@ -255,17 +343,19 @@ class AdbProxy:
             await self.writer.wait_closed()
 
     @staticmethod
-    async def attach_raw(connect_to_device, device_id):
+    async def attach_raw(connect_to_device, listen_from_device, device_id):
         # Fetch device name -- also acts as a quick test that the device is valid
-        name_reader, name_writer = await AdbProxy.open_stream(connect_to_device, device_id, "shell:getprop ro.product.vendor.model")
-        device_name = (await name_reader.read()).decode("utf-8").strip()
-        name_writer.close()
-        await name_writer.wait_closed()
+        name_reader, name_writer = await AdbProxy.open_stream(connect_to_device, device_id, "shell:getprop ro.product.model")
+        try:
+            device_name = (await name_reader.read()).decode("utf-8").strip()
+        finally:
+            name_writer.close()
+            await name_writer.wait_closed()
 
         proxy_task = [None]
 
         def on_connected(r, w):
-            proxy_task[0] = asyncio.create_task(AdbProxy(r, w, connect_to_device, device_id, device_name).go())
+            proxy_task[0] = asyncio.create_task(AdbProxy(r, w, connect_to_device, listen_from_device, device_id, device_name).go())
 
         server = await asyncio.start_server(on_connected, "localhost", 0)
         try:
@@ -286,23 +376,8 @@ class AdbProxy:
             await check_call("adb", "disconnect", socket_addr_str)
 
     @staticmethod
-    async def attach_tcpip(device_adb_addr, device_id):
-        async def connect_to_device():
-            return await asyncio.open_connection(*device_adb_addr)
-        return await AdbProxy.attach_raw(connect_to_device, device_id)
-
-    @staticmethod
-    async def attach_ssh(device_id, device_adb_addr=("localhost", 5037), **ssh_opts):
-        async with asyncssh.connect(**ssh_opts) as ssh_client:
-            async def connect_to_device():
-                return await ssh_client.open_connection(remote_host=device_adb_addr[0], remote_port=device_adb_addr[1])
-            print("SSH bridge Connected!")
-            return await AdbProxy.attach_raw(connect_to_device, device_id)
-
-    @staticmethod
     async def attach(device_id, device_adb_addr=("localhost", 5037), ssh_tunnels=[]):
         async def recursive(current_tunnel, remaining_tunnels):
-            print("recursive")
             if (remaining_tunnels):
                 async with asyncssh.connect(tunnel=current_tunnel, **remaining_tunnels[0]) as ssh_client:
                     print(f"SSH bridge Connected: {remaining_tunnels[0]}")
@@ -311,12 +386,21 @@ class AdbProxy:
             if current_tunnel:
                 async def connect_to_device():
                     return await current_tunnel.open_connection(remote_host=device_adb_addr[0], remote_port=device_adb_addr[1])
+                async def listen_from_device(on_connected):
+                    server = await current_tunnel.start_server(lambda *args: on_connected, listen_host='localhost', listen_port=0)
+                    port = server.get_port()
+                    return server, port
             else:
                 async def connect_to_device():
                     return await asyncio.open_connection(*device_adb_addr)
-            return await AdbProxy.attach_raw(connect_to_device, device_id)
+                async def listen_from_device(on_connected):
+                    server = await asyncio.start_server(on_connected, "localhost", 0)
+                    port = server.sockets[0].getsockname()[1]
+                    return server, port
+            return await AdbProxy.attach_raw(connect_to_device, listen_from_device, device_id)
 
         return await recursive(None, ssh_tunnels)
+
 
 async def check_call(program, *args, **kwargs):
     proc = await asyncio.create_subprocess_exec(program, *args, **kwargs)
@@ -326,20 +410,7 @@ async def check_call(program, *args, **kwargs):
 
 
 async def main_task(device_id, device_adb_addr, ssh_tunnels=[]):
-    #await AdbProxy.attach_tcpip(device_adb_addr, device_id)
-    #await AdbProxy.attach_ssh(device_id, ssh_tunnels)
     await AdbProxy.attach(device_id, device_adb_addr, ssh_tunnels)
-
-async def main_ssh_task():
-    ssh_opts = {
-        "host": "localhost",
-        "username": "paulo",
-        "known_hosts": None, # Disable server validation
-        #client_keys=open("/home/paulo/Downloads/prikey.pem", "rb").read()
-    }
-    async with SshAttachedAdbDevice(ssh_opts, "emulator-5554"):
-        print("wait forever")
-        await asyncio.Semaphore(0).acquire()
 
 
 def run_loop(task):
@@ -353,6 +424,7 @@ def run_loop(task):
         loop.run_until_complete(task)
     except asyncio.CancelledError:
         pass
+
 
 def sockaddr(addr):
     host, port = addr.split(":")
