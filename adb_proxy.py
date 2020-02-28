@@ -16,15 +16,10 @@
 import argparse
 import argcomplete
 import asyncio
-import os
 import json
-import aioboto3
-import aiohttp
-import collections
 import asyncssh
 import struct
 import binascii
-import traceback
 import logging
 import signal
 
