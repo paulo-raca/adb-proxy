@@ -473,21 +473,20 @@ async def connect_reverse(server_config, device_id, device_adb_addr=("localhost"
 
 async def main():
     parser = argparse.ArgumentParser(description="Creates ADB Proxy connections")
-    subparsers = parser.add_subparsers(help='commands')
+    subparsers = parser.add_subparsers(help='commands', required=True)
+    subparsers.required = True
+    subparsers.dest = 'action'
 
     parser_connect_client = subparsers.add_parser('connect', help='Makes a direct connection to the device ADB')
-    parser_connect_client .set_defaults(cmd='connect')
     parser_connect_client.add_argument("-s", "--serial", help="Device serial number")
     parser_connect_client.add_argument("-r", "--device-server", type=sockaddr, default=("localhost", 5037), help="Socket address of device ADB server")
     parser_connect_client.add_argument("-J", "--ssh-tunnel", action="append", type=ssh_config, help="Add a SSH jump host to access the device ADB server")
 
     parser_listen_reverse = subparsers.add_parser('listen-reverse', help='Awaits reverse connections from devices')
-    parser_listen_reverse.set_defaults(cmd='listen-reverse')
     parser_listen_reverse.add_argument("server-address", type=ssh_config, default={}, help="Server address where the reverse SSH server will be bound")
     parser_listen_reverse.add_argument("-J", "--ssh-tunnel", action="append", type=ssh_config, help="Add a SSH jump host to access the device ADB server")
 
     parser_connect_reverse = subparsers.add_parser('connect-reverse', help='Creates a reverse connection to a remote ADB server')
-    parser_connect_reverse.set_defaults(cmd='connect-reverse')
     parser_connect_reverse.add_argument("server-address", type=ssh_config, default={}, help="Address that the remote ADB is listening on")
     parser_connect_reverse.add_argument("-s", "--serial", help="Device serial number")
     parser_connect_reverse.add_argument("-r", "--device-server", type=sockaddr, default=("localhost", 5037), help="Socket address of device ADB server")
@@ -496,18 +495,18 @@ async def main():
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    if args.cmd == 'connect':
+    if args.action == 'connect':
         await attach(
                 device_id = args.serial,
                 device_adb_addr = args.device_server,
                 ssh_tunnels = args.ssh_tunnel)
 
-    elif args.cmd == 'listen-reverse':
+    elif args.action == 'listen-reverse':
         await(listen_reverse(
                 server_config = getattr(args, "server-address"),
                 ssh_tunnels = args.ssh_tunnel))
 
-    elif args.cmd == 'connect-reverse':
+    elif args.action == 'connect-reverse':
         await(connect_reverse(
                 server_config = getattr(args, "server-address"),
                 device_id = args.serial,
