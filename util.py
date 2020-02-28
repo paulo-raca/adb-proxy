@@ -1,4 +1,5 @@
 import asyncio
+import urllib
 
 async def check_call(program, *args, **kwargs):
     proc = await asyncio.create_subprocess_exec(program, *args, **kwargs)
@@ -13,18 +14,20 @@ async def close_and_wait(x):
 
 
 def sockaddr(addr):
-    host, port = addr.split(":")
-    return host, int(port)
+    parsed = urllib.parse.urlsplit('//' + addr)
+    return parsed.hostname, parsed.port
 
 
 def ssh_config(config):
+    parsed = urllib.parse.urlsplit('//' + config)
     ret = {
-        "known_hosts": None
+        "known_hosts": None,
     }
-    if '@' in config:
-        ret["username"], config = config.split("@", 1)
-    if ":" in config:
-        config, port = config.split(":", 1)
-        ret["port"] = int(port)
-    ret["host"] = config
+    if parsed.username is not None:
+        ret["username"] = parsed.username
+    if parsed.hostname is not None:
+        ret["host"] = parsed.hostname
+    if parsed.port is not None:
+        ret["port"] = parsed.port
+
     return ret
