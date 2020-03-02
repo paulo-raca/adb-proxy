@@ -1,0 +1,2 @@
+asyncssh>=2.1.0
+argcomplete>=1.10.3
