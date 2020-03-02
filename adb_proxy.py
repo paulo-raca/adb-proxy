@@ -473,7 +473,7 @@ async def connect_reverse(server_config, device_id, device_adb_addr=("localhost"
 
 async def main():
     parser = argparse.ArgumentParser(description="Creates ADB Proxy connections")
-    subparsers = parser.add_subparsers(help='commands', required=True)
+    subparsers = parser.add_subparsers(help='commands')
     subparsers.required = True
     subparsers.dest = 'action'
 
