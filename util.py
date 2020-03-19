@@ -33,6 +33,8 @@ def ssh_config(config):
 
     return ret
 
+def hostport(sockaddr):
+    return uri.URI(hostname=sockaddr[0], port=sockaddr[1]).uri[2:-1]
 
 
 def asyncio_run(main, *, debug=True):

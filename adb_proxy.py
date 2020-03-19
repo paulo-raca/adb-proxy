@@ -172,7 +172,7 @@ class AdbProxy:
             logger.info(f"open sent")
 
         listener, listen_addr = await self.device_endpoint.listen(on_connected)
-        proxy = f"tcp:{listen_addr[1]}"
+        proxy = f"tcp:{hostport(listen_addr)}"
         cmd = f"reverse:forward:{remote};{proxy}"
 
         ret = await self.read_stream(cmd)
@@ -244,6 +244,12 @@ class AdbProxy:
                 elif name.startswith("reverse:"):
                     raise Exception(f"Unsupported reverse proxy command: {repr(name)}")
 
+            hostshell_prefix = "shell:hostshell"
+            if name == hostshell_prefix or name.startswith(hostshell_prefix + " "):
+                command = name[len(hostshell_prefix)+1:]
+                print(f"command={command}")
+
+
             reader, writer = await self.open_stream(name)
             logger.info(f"{local_id}[{name}] opened")
 
@@ -262,7 +268,7 @@ class AdbProxy:
     async def go(self):
         """ Main method, executes the proxying between local server and remote device """
         try:
-            logger.info(f"ADB Wrapper for {self.device_id}: {self.device_name} connected!")
+            logger.info(f"Connected to {self.device_id} @ {self.device_endpoint.local_hostname}: {self.device_name}")
 
             await self.send_cmd(b'CNXN', self.protocol_version, self.max_data_len, f"device:wrapped-{self.device_id}:{self.device_name}")
             # Wait until receives a CNXN
@@ -347,21 +353,20 @@ class AdbProxy:
         proxy_task = [None]
 
         def on_connected(r, w):
-            print("On connected", r, w)
+            logger.info(f"Connected to ADB server @ {local_endpoint.local_hostname}")
             proxy_task[0] = asyncio.create_task(AdbProxy(r, w, remote_endpoint, device_id, device_name, reverse_connection_supported).go())
 
         server, server_addr = await local_endpoint.listen(on_connected)
-        addr = uri.URI(hostname=server_addr[0], port=server_addr[1]).uri[2:-1]
+        addr = hostport(server_addr)
         async with server:
             # Execute "adb connect <host>"
-            print(f"host:connect:{addr}")
-            print(local_endpoint)
-            print(await read_stream(local_endpoint, f"host:connect:{addr}"))
-            await asyncio.sleep(50)
+            await read_stream(local_endpoint, f"host:connect:{addr}")
 
         try:
             if proxy_task[0]:
                 await proxy_task[0]
+            else:
+                raise Exception("Didn't receive a connection from ADB")
 
         finally:
             try:
