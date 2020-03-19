@@ -4,9 +4,9 @@ def device_path(device_id):
     return f"host:transport:{device_id}"
 
 
-async def open_stream(adb_connect, *path):
+async def open_stream(endpoint, *path):
     """ Open a stream to the device """
-    reader, writer = await adb_connect()
+    reader, writer = await endpoint.connect_to_adb()
 
     try:
         for cmd in path:
@@ -20,9 +20,9 @@ async def open_stream(adb_connect, *path):
                 if status == b'FAIL':
                     size = int(await reader.readexactly(4), 16)
                     message = (await reader.readexactly(size)).decode('utf-8')
-                    raise Exception(f"Cannot open '{cmd}': {status}: {message}")
+                    raise Exception(f"Cannot run '{cmd}': {status}: {message}")
                 else:
-                    raise Exception(f"Cannot open '{cmd}': Unknown status {status}")
+                    raise Exception(f"Cannot run '{cmd}': Unknown status {status}")
 
         return reader, writer
 
@@ -39,8 +39,8 @@ async def read_stream(*args, **kwargs):
     finally:
         await close_and_wait(writer)
 
-async def list_adb_devices(adb_connect):
-    lines = (await read_stream(adb_connect, "host:devices"))[4:].decode('utf-8').splitlines()
+async def list_adb_devices(endpoint):
+    lines = (await read_stream(endpoint, "host:devices"))[4:].decode('utf-8').splitlines()
     ret = []
     for line in lines:
         line = line.strip()

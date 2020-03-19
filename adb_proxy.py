@@ -25,6 +25,7 @@ import signal
 
 from adb_channel import *
 from util import *
+from endpoint import *
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('adb-proxy')
@@ -113,9 +114,8 @@ class AdbProxy:
     """
     This represents a proxy connected to the local ADB server
     """
-    def __init__(self, reader, writer, connect_to_device, listen_from_device, device_id, device_name, reverse_connection_supported=True):
-        self.connect_to_device = connect_to_device
-        self.listen_from_device = listen_from_device
+    def __init__(self, reader, writer, device_endpoint, device_id, device_name, reverse_connection_supported=True):
+        self.device_endpoint = device_endpoint
         self.device_id = device_id
         self.device_name = device_name
         self.protocol_version = 0x1000000
@@ -129,10 +129,10 @@ class AdbProxy:
         self.next_local_id = 1
 
     async def open_stream(self, *name):
-        return await open_stream(self.connect_to_device, device_path(self.device_id), *name)
+        return await open_stream(self.device_endpoint, device_path(self.device_id), *name)
 
     async def read_stream(self, *name):
-        return await read_stream(self.connect_to_device, device_path(self.device_id), *name)
+        return await read_stream(self.device_endpoint, device_path(self.device_id), *name)
 
     async def send_cmd(self, cmd, arg0, arg1, data=b''):
         """ Send a command to the local ADB Server """
@@ -171,8 +171,8 @@ class AdbProxy:
             await self.send_cmd(b"OPEN", stream_id, 0, local.encode('utf-8'))
             logger.info(f"open sent")
 
-        listener, port = await self.listen_from_device(on_connected)
-        proxy = f"tcp:{int(port)}"
+        listener, listen_addr = await self.device_endpoint.listen(on_connected)
+        proxy = f"tcp:{listen_addr[1]}"
         cmd = f"reverse:forward:{remote};{proxy}"
 
         ret = await self.read_stream(cmd)
@@ -329,8 +329,8 @@ class AdbProxy:
 
 
     @staticmethod
-    async def attach_raw(connect_to_device, listen_from_device, device_id, reverse_connection_supported):
-        devices = await list_adb_devices(connect_to_device)
+    async def attach_raw(local_endpoint, remote_endpoint, device_id, reverse_connection_supported):
+        devices = await list_adb_devices(remote_endpoint)
         if device_id is None:
             if len(devices) == 1:
                 device_id = devices[0]
@@ -342,54 +342,45 @@ class AdbProxy:
             raise Exception(f"device '{device_id}' not found")
 
         # Fetch device name -- also acts as a quick test that the device is valid
-        device_name = (await read_stream(connect_to_device, device_path(device_id), "shell:getprop ro.product.model")).decode("utf-8").strip()
+        device_name = (await read_stream(remote_endpoint, device_path(device_id), "shell:getprop ro.product.model")).decode("utf-8").strip()
 
         proxy_task = [None]
 
         def on_connected(r, w):
-            proxy_task[0] = asyncio.create_task(AdbProxy(r, w, connect_to_device, listen_from_device, device_id, device_name, reverse_connection_supported).go())
+            print("On connected", r, w)
+            proxy_task[0] = asyncio.create_task(AdbProxy(r, w, remote_endpoint, device_id, device_name, reverse_connection_supported).go())
 
-        server = await asyncio.start_server(on_connected, "localhost", 0)
-        try:
-            socket_addr = server.sockets[0].getsockname()
-            if ':' in socket_addr[0]:
-                socket_addr_str = f"[{socket_addr[0]}]:{socket_addr[1]}"
-            else:
-                socket_addr_str = f"{socket_addr[0]}:{socket_addr[1]}"
-            await check_call("adb", "connect", socket_addr_str)
-        finally:
-            await close_and_wait(server)
+        server, server_addr = await local_endpoint.listen(on_connected)
+        addr = uri.URI(hostname=server_addr[0], port=server_addr[1]).uri[2:-1]
+        async with server:
+            # Execute "adb connect <host>"
+            print(f"host:connect:{addr}")
+            print(local_endpoint)
+            print(await read_stream(local_endpoint, f"host:connect:{addr}"))
+            await asyncio.sleep(50)
 
         try:
             if proxy_task[0]:
                 await proxy_task[0]
+
         finally:
             try:
-                await check_call("adb", "disconnect", socket_addr_str)
+                # Execute "adb connect <host>"
+                await read_stream(local_endpoint, f"host:disconnect:{addr}")
             except:
                 pass
 
 
-async def connect(device_id, device_adb_addr=("localhost", 5037), adb_reverse_supported=True, ssh_tunnels=[], ssh_client=None):
-    if ssh_client:
-        async def connect_to_device():
-            return await ssh_client.open_connection(remote_host=device_adb_addr[0], remote_port=device_adb_addr[1])
-        async def listen_from_device(on_connected):
-            server = await ssh_client.start_server(lambda *args: on_connected, listen_host='localhost', listen_port=0)
-            port = server.get_port()
-            return server, port
-    else:
-        async def connect_to_device():
-            return await asyncio.open_connection(*device_adb_addr)
-        async def listen_from_device(on_connected):
-            server = await asyncio.start_server(on_connected, "localhost", 0)
-            port = server.sockets[0].getsockname()[1]
-            return server, port
-    logger.info(f"Connecting to {device_adb_addr[0]}:{device_adb_addr[1]}...")
-    return await AdbProxy.attach_raw(connect_to_device, listen_from_device, device_id, adb_reverse_supported)
+async def connect(device_id, adb_reverse_supported=True, share=False, host_adb_addr=("localhost", 5037), device_adb_addr=("localhost", 5037), ssh_client=None):
+    logger.info(f"Connecting...")
+    local_endpoint = await Endpoint.of(host_adb_addr)
+    remote_endpoint = await Endpoint.of(device_adb_addr, ssh_client)
+    if share:
+        local_endpoint, remote_endpoint = remote_endpoint, local_endpoint
+    return await AdbProxy.attach_raw(local_endpoint, remote_endpoint, device_id, adb_reverse_supported)
 
 
-async def listen_reverse(listen_address, ssh_tunnels=[], ssh_client=None):
+async def listen_reverse(listen_address, ssh_client=None, **kwargs):
     listen_address.setdefault("username", "adb-proxy")
     listen_address.setdefault("host", "localhost")
     listen_address.setdefault("port", 0)
@@ -406,7 +397,7 @@ async def listen_reverse(listen_address, ssh_tunnels=[], ssh_client=None):
         async with ssh_client:
             logger.info(f"Reverse connection received")
             try:
-                await connect(ssh_client=ssh_client, **attach_opts)
+                await connect(ssh_client=ssh_client, **kwargs, **attach_opts)
             finally:
                 logger.info(f"Reverse connection lost")
 
@@ -474,8 +465,6 @@ async def use_ssh_tunnels(func, ssh_tunnels=[], ssh_client=None, **kwargs):
 
 
 async def main():
-    asyncssh.set_log_level('INFO')
-
     parser = argparse.ArgumentParser(description="Creates ADB Proxy connections")
 
     ssh_jump_parser = argparse.ArgumentParser(add_help=False)
@@ -485,18 +474,23 @@ async def main():
     deviceinfo_parser.add_argument("-s", "--serial", dest="device_id", help="Device serial number")
     deviceinfo_parser.add_argument("--device-adb-server", dest="device_adb_addr", type=sockaddr, default=("localhost", 5037), help="Socket address of ADB server attached to the device")
     deviceinfo_parser.add_argument("--no-adb-reverse", dest="adb_reverse_supported", action="store_false", help="Disables reverse connection proxy (device->host)")
+    deviceinfo_parser.add_argument("--share", dest="share", action="store_true", help="Swaps the roles of local and remote endpoints (Shares a local device with a remote computer)")
+
+    hostinfo_parser = argparse.ArgumentParser(add_help=False)
+    deviceinfo_parser.add_argument("--host-adb-server", dest="host_adb_addr", type=sockaddr, default=("localhost", 5037), help="Socket address of ADB server away from the device")
+
 
     subparsers = parser.add_subparsers(help='commands')
     subparsers.required = True
 
-    parser_connect_client = subparsers.add_parser('connect', parents=[deviceinfo_parser, ssh_jump_parser], help='Makes a direct connection to the device ADB')
+    parser_connect_client = subparsers.add_parser('connect', parents=[deviceinfo_parser, hostinfo_parser, ssh_jump_parser], help='Makes a direct connection to the device ADB')
     parser_connect_client.set_defaults(func=connect)
 
     parser_connect_reverse = subparsers.add_parser('connect-reverse', parents=[deviceinfo_parser, ssh_jump_parser], help='Creates a reverse connection to a remote server created with listen-reverse')
     parser_connect_reverse.add_argument("server_address", type=ssh_config, nargs='?', default={}, help="Address that the remote ADB-Proxy is listening on")
     parser_connect_reverse.set_defaults(func=connect_reverse)
 
-    parser_listen_reverse = subparsers.add_parser('listen-reverse', parents=[ssh_jump_parser], help='Awaits reverse connections from devices')
+    parser_listen_reverse = subparsers.add_parser('listen-reverse', parents=[hostinfo_parser, ssh_jump_parser], help='Awaits reverse connections from devices')
     parser_listen_reverse.add_argument("listen_address", type=ssh_config, nargs='?', default={}, help="Server address where the reverse SSH server will be bound")
     parser_listen_reverse.set_defaults(func=listen_reverse)
 

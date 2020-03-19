@@ -1,5 +1,5 @@
 import asyncio
-import urllib
+import uri
 import signal
 
 async def check_call(program, *args, **kwargs):
@@ -15,12 +15,12 @@ async def close_and_wait(x):
 
 
 def sockaddr(addr):
-    parsed = urllib.parse.urlsplit('//' + addr)
+    parsed = uri.URI('//' + addr + "/")
     return parsed.hostname, parsed.port
 
 
 def ssh_config(config):
-    parsed = urllib.parse.urlsplit('//' + config)
+    parsed = uri.URI('//' + config + "/")
     ret = {
         "known_hosts": None,
     }
