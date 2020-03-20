@@ -480,7 +480,7 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
             logger.info(f"Incoming connection to {dest_host}:{dest_port}")
             return True
 
-    server_host_key = asyncssh.generate_private_key("ssh-rsa")
+    server_host_key = asyncssh.generate_private_key("ecdsa-sha2-nistp256")
     ssh_conn = await asyncssh.connect_reverse(
             server_factory = MySSHServer,
             tunnel = ssh_client,
