@@ -60,7 +60,7 @@ class AdbProxyChannel:
             self.writer.write(data)
             await self.writer.drain()
 
-            logger.debug(f"{self.local_id}[{self.name}] << {data}")
+            #logger.debug(f"{self.local_id}[{self.name}] << {data}")
             self.bytes_sent += len(data)
 
             await self.adb_device.send_cmd(b'OKAY', self.local_id, self.remote_id)
@@ -81,13 +81,13 @@ class AdbProxyChannel:
                 if not data:
                     break
 
-                logger.debug(f"{self.local_id}[{self.name}] >> [{data}]")
+                #logger.debug(f"{self.local_id}[{self.name}] >> [{data}]")
                 self.bytes_received += len(data)
 
                 await self.adb_device.send_cmd(b'WRTE', self.local_id, self.remote_id, data)
 
             # Stream closed by device
-            logger.debug(f"{self.local_id}[{self.name}] >> [EOF]")
+            #logger.debug(f"{self.local_id}[{self.name}] >> [EOF]")
         except asyncio.CancelledError as e:
             pass
         except Exception as e:
@@ -140,7 +140,7 @@ class AdbProxy:
         if isinstance(data, str):
             data = data.encode("utf-8")
 
-        logger.debug(f"Send {cmd}, arg0={arg0}, arg1={arg1}, data={data}")
+        #logger.debug(f"Send {cmd}, arg0={arg0}, arg1={arg1}, data={data}")
         cmd, = struct.unpack("<I", cmd)
         header = struct.pack("<IIIIII", cmd, arg0, arg1, len(data), binascii.crc32(data), cmd ^ 0xFFFFFFFF)
         self.writer.write(header)
@@ -157,7 +157,7 @@ class AdbProxy:
         #if crc32 != 0 and crc32 != binascii.crc32(data):
             #logger.warning(f"recv_cmd checksum mistmatch: Got {binascii.crc32(data)}, expected {crc32}")
 
-        logger.debug(f"Recv {header_blob[:4]}, arg0={arg0}, arg1={arg1}, data={data}")
+        #logger.debug(f"Recv {header_blob[:4]}, arg0={arg0}, arg1={arg1}, data={data}")
         return header_blob[:4], arg0, arg1, data
 
     async def reverse_create(self, remote, local, local_id, remote_id):
