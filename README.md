@@ -68,14 +68,14 @@ DeviceFarm is a special type of reverse connection: We cannot access the compute
 
 We set up the local machine to `listen-reverse` on a public IP address and execute `connect-reverse` on the DeviceFarm `TestSpec`
 
-There is a separate script that performs `listen-reverse` + executes an new Job on DeviceFarm:
+There is helper subcommand that performs `listen-reverse` and schedules a new Job on DeviceFarm:
 
 ```bash
-user@mycomputer$ ./run-aws.py my_ip:port  # Assuming my_ip is available externally
+user@mycomputer$ ./adb_proxy.py device-farm my_ip:port  # Assuming my_ip is available externally
 ```
 
 ```bash
-user@mycomputer$ ./run-aws.py gateway_ip:port -J user@gatewaycomputer  # Assuming gateway_ip is available externally
+user@mycomputer$ ./adb_proxy.py device-farm gateway_ip:port -J user@gatewaycomputer  # Assuming gateway_ip is available externally
 ```
 
 #### UPnP
@@ -83,7 +83,7 @@ user@mycomputer$ ./run-aws.py gateway_ip:port -J user@gatewaycomputer  # Assumin
 For those of us acessing the internet behind a UPnP-capable NAT, we can simply:
 
 ```bash
-user@mycomputer$ ./run-aws.py --upnp  # Will figure out IP and port automatically
+user@mycomputer$ ./adb_proxy.py device-farm --upnp  # Will automatically set port forwarding from a public ip
 ```
 
 ## Iteractive session with `scrcpy`

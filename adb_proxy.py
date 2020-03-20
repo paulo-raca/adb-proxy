@@ -26,8 +26,9 @@ import signal
 from adb_channel import *
 from util import *
 from endpoint import *
+from upnp import UPnP
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('adb-proxy')
 logger.setLevel(logging.INFO)
 
@@ -400,7 +401,14 @@ async def connect(device_id, adb_reverse_supported=True, share=False, host_adb_a
     return await AdbProxy.attach_raw(local_endpoint, remote_endpoint, device_id, adb_reverse_supported)
 
 
-async def listen_reverse(listen_address, ssh_client=None, wait_for=None, **kwargs):
+async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=False, **kwargs):
+    if upnp:
+        if ssh_client:
+            raise Exception("Use either UPnP or SSH tunnels")
+        upnp = await UPnP.get()
+        listen_address["host"] = upnp.lan_ip
+        listen_address["port"] = 0
+
     listen_address.setdefault("username", "adb-proxy")
     listen_address.setdefault("host", "localhost")
     listen_address.setdefault("port", 0)
@@ -441,13 +449,23 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, **kwarg
                 socket_addr = (listen_address['username'], server.sockets[0].getsockname()[0], server.sockets[0].getsockname()[1])
             except:
                 socket_addr = (listen_address['username'], listen_address["host"], server.get_port())
-            logger.info(f"Listening for reverse connections: {userhostport(socket_addr)}")
 
-            if wait_for:
-                await wait_for(socket_addr, ssh_client=ssh_client)
+            async def wait_until_complete():
+                logger.info(f"Listening for reverse connections: {userhostport(socket_addr)}")
+                if wait_for:
+                    await wait_for(socket_addr, ssh_client=ssh_client)
+                else:
+                    # Block until cancel
+                    logger.info(f"Cancel with Ctrl-C")
+                    await asyncio.Semaphore(0).acquire()
+
+            if upnp:
+                async with upnp.map_port(socket_addr[1:], "ADB Proxy") as port_map:
+                    socket_addr = (socket_addr[0], *port_map.ext_addr)
+                    await wait_until_complete()
             else:
-                # Block until cancel
-                await asyncio.Semaphore(0).acquire()
+                await wait_until_complete()
+
     finally:
         # Finish any pending connections
         for task in connections:
@@ -494,14 +512,25 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
         logger.info(f"Disconnected")
 
 
+async def devicefarm(project_name, device_pool, *args, **kwargs):
+    # This is the only "security" measure: The client must use a matching random username
+    kwargs["listen_address"]["username"] = f"adb-proxy-{random_str(15)}"
 
-async def use_ssh_tunnels(func, ssh_tunnels=[], ssh_client=None, *args, **kwargs):
+    async def listen_until(socket_addr, ssh_client):
+        import aws
+        await aws.run_async(project_name, device_pool, socket_addr)
+
+    return await listen_reverse(*args, **kwargs, wait_for=listen_until)
+
+
+async def use_tunnels(func, ssh_tunnels=[], ssh_client=None, *args, **kwargs):
     if ssh_tunnels:
         async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
             logger.info(f"Jumping through SSH proxy: {ssh_tunnels[0]}")
             return await use_ssh_tunnels(ssh_tunnels=ssh_tunnels[1:], ssh_client=ssh_client, func=func, *args, **kwargs)
 
     return await func(ssh_client=ssh_client, **kwargs)
+
 
 
 async def main():
@@ -517,8 +546,11 @@ async def main():
     deviceinfo_parser.add_argument("--share", dest="share", action="store_true", help="Swaps the roles of local and remote endpoints (Shares a local device with a remote computer)")
 
     hostinfo_parser = argparse.ArgumentParser(add_help=False)
-    deviceinfo_parser.add_argument("--host-adb-server", dest="host_adb_addr", type=sockaddr, default=("localhost", 5037), help="Socket address of ADB server away from the device")
+    hostinfo_parser.add_argument("--host-adb-server", dest="host_adb_addr", type=sockaddr, default=("localhost", 5037), help="Socket address of ADB server away from the device")
 
+    listen_reverser_base_parser = argparse.ArgumentParser(add_help=False, parents=[hostinfo_parser, ssh_jump_parser])
+    listen_reverser_base_parser.add_argument("listen_address", type=ssh_config, nargs='?', default={}, help="Server address where the reverse SSH server will be bound")
+    listen_reverser_base_parser.add_argument("--upnp", action='store_true', help="Uses UPNP to setup the Internet Gateway to receive incoming connections")
 
     subparsers = parser.add_subparsers(help='commands')
     subparsers.required = True
@@ -530,14 +562,18 @@ async def main():
     parser_connect_reverse.add_argument("server_address", type=ssh_config, nargs='?', default={}, help="Address that the remote ADB-Proxy is listening on")
     parser_connect_reverse.set_defaults(func=connect_reverse)
 
-    parser_listen_reverse = subparsers.add_parser('listen-reverse', parents=[hostinfo_parser, ssh_jump_parser], help='Awaits reverse connections from devices')
-    parser_listen_reverse.add_argument("listen_address", type=ssh_config, nargs='?', default={}, help="Server address where the reverse SSH server will be bound")
+    parser_listen_reverse = subparsers.add_parser('listen-reverse', parents=[listen_reverser_base_parser], help='Awaits reverse connections from devices')
     parser_listen_reverse.set_defaults(func=listen_reverse)
+
+    parser_df = subparsers.add_parser('device-farm', parents=[listen_reverser_base_parser], help='Awaits connections from DeviceFarm')
+    parser_df.add_argument("--project", dest='project_name', default="Remote Debug", help="Project Name")
+    parser_df.add_argument("--device-pool", dest='device_pool', default="Default Pool", help="Device Pool")
+    parser_df.set_defaults(func=devicefarm)
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    await use_ssh_tunnels(**args.__dict__)
+    await use_tunnels(**args.__dict__)
 
 if __name__ == "__main__":
     asyncio_run(main())
