@@ -27,8 +27,10 @@ from adb_channel import *
 from util import *
 from endpoint import *
 from upnp import UPnP
+import aws
 
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('adb-proxy')
 logger.setLevel(logging.INFO)
 
@@ -94,21 +96,21 @@ class AdbProxyChannel:
         except Exception as e:
             logger.warning(f"{self.local_id}[{self.name}] >> error: {type(e)}: {e}")
         finally:
-            await self.close(kill_sink=False)
+            await self.close()
 
-    async def close(self, kill_sink=True, send_close_cmd=True, quiet=False):
+    async def close(self, send_close_cmd=True, quiet=False):
         # Stream closed by ADB
         if self.local_id in self.adb_device.streams:
+            del self.adb_device.streams[self.local_id]
             if not quiet:
                 logger.info(f"{self.local_id}[{self.name}] closed, sent={self.bytes_sent} bytes, recv={self.bytes_received} bytes")
-            del self.adb_device.streams[self.local_id]
             self.writer.close()
-            if kill_sink:
+            if asyncio.current_task() != self.sink_task:
                 self.sink_task.cancel()
                 await self.sink_task
             if send_close_cmd:
                 await self.adb_device.send_cmd(b'CLSE', self.local_id, self.remote_id)
-        await close_and_wait(self.writer)
+        self.writer.close()
 
 
 class AdbProxy:
@@ -188,11 +190,11 @@ class AdbProxy:
             old_listener = self.reverse_listeners.pop(remote, None)
             if old_listener:
                 logger.info(f"Closing previous reverse tunnel to {remote}")
-                await close_and_wait(old_listener)
+                old_listener.close()
             self.reverse_listeners[remote] = listener
         else:
             logger.warning(f"Failed to create reverse tunnel: {tunnel_desc}")
-            await close_and_wait(listener)
+            listener.close()
 
         await self.send_cmd(b'OKAY', local_id, remote_id)
         await self.send_cmd(b'WRTE', local_id, remote_id, ret)
@@ -206,7 +208,7 @@ class AdbProxy:
             old_listener = self.reverse_listeners.pop(remote, None)
             if old_listener:
                 logger.info(f"Closing reverse tunnel to {remote}")
-                await close_and_wait(old_listener)
+                old_listener.close()
 
         await self.send_cmd(b'OKAY', local_id, remote_id)
         await self.send_cmd(b'WRTE', local_id, remote_id, ret)
@@ -215,7 +217,7 @@ class AdbProxy:
     async def reverse_remove_all(self, local_id, remote_id):
         for remote, old_listener in self.reverse_listeners.items():
             logger.info(f"Closing reverse tunnel to {remote}")
-            await close_and_wait(old_listener)
+            old_listener.close()
         self.reverse_listeners.clear()
 
         await self.send_cmd(b'OKAY', local_id, remote_id)
@@ -250,7 +252,6 @@ class AdbProxy:
             hostshell_prefix = "shell:hostshell"
             if name == hostshell_prefix or name.startswith(hostshell_prefix + " "):
                 command = name[len(hostshell_prefix)+1:].strip() or None
-                print(f"command={command}")
                 reader, writer = await self.device_endpoint.shell(command)
             else:
                 reader, writer = await self.open_stream(name)
@@ -326,17 +327,16 @@ class AdbProxy:
         finally:
             logger.info(f"ADB Wrapper for {self.device_id}: {self.device_name} disconnected!")
 
-            if self.reverse_listeners:
-                await asyncio.wait([
-                    close_and_wait(old_listener)
-                    for old_listener in self.reverse_listeners.values()
-                ])
+            for old_listener in self.reverse_listeners.values():
+                old_listener.close()
+
             if self.streams:
                 await asyncio.wait([
                     stream.close(send_close_cmd=False, quiet=True)
                     for stream in self.streams.values()
                 ])
-            await close_and_wait(self.writer)
+
+            self.writer.close()
 
 
     @staticmethod
@@ -470,7 +470,8 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
         # Finish any pending connections
         for task in connections:
             task.cancel()
-        await asyncio.tasks.gather(*connections)
+        if connections:
+            await asyncio.tasks.gather(*connections)
 
 
 async def connect_reverse(server_address, ssh_client=None, **kwargs):
@@ -517,8 +518,7 @@ async def devicefarm(project_name, device_pool, *args, **kwargs):
     kwargs["listen_address"]["username"] = f"adb-proxy-{random_str(15)}"
 
     async def listen_until(socket_addr, ssh_client):
-        import aws
-        await aws.run_async(project_name, device_pool, socket_addr)
+        await aws.run(project_name, device_pool, socket_addr)
 
     return await listen_reverse(*args, **kwargs, wait_for=listen_until)
 
@@ -527,7 +527,7 @@ async def use_tunnels(func, ssh_tunnels=[], ssh_client=None, *args, **kwargs):
     if ssh_tunnels:
         async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
             logger.info(f"Jumping through SSH proxy: {ssh_tunnels[0]}")
-            return await use_ssh_tunnels(ssh_tunnels=ssh_tunnels[1:], ssh_client=ssh_client, func=func, *args, **kwargs)
+            return await use_tunnels(ssh_tunnels=ssh_tunnels[1:], ssh_client=ssh_client, func=func, *args, **kwargs)
 
     return await func(ssh_client=ssh_client, **kwargs)
 
@@ -576,4 +576,4 @@ async def main():
     await use_tunnels(**args.__dict__)
 
 if __name__ == "__main__":
-    asyncio_run(main())
+    asyncio_run(main(), debug=True)

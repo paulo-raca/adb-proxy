@@ -11,11 +11,6 @@ async def check_call(program, *args, **kwargs):
         raise Exception(f"{program} exited with code {exitcode}")
 
 
-async def close_and_wait(x):
-    x.close()
-    await x.wait_closed()
-
-
 def sockaddr(addr):
     parsed = uri.URI('//' + addr + "/")
     return parsed.hostname, parsed.port

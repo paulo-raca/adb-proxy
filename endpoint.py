@@ -1,6 +1,5 @@
 import asyncio
 from abc import ABC, abstractmethod
-from util import close_and_wait
 import socket
 import asyncssh
 
@@ -10,7 +9,7 @@ class Endpoint(ABC):
         if ssh_client:
             reader, writer = await ssh_client.open_connection(remote_host=adb_sockaddr[0], remote_port=adb_sockaddr[1])
             local_addr = writer.get_extra_info('sockname')[0]
-            await close_and_wait(writer)
+            writer.close()
 
             hostname = ssh_client._host or local_addr
             try:
@@ -26,7 +25,7 @@ class Endpoint(ABC):
         else:
             reader, writer = await asyncio.open_connection(adb_sockaddr[0], adb_sockaddr[1])
             local_addr = writer.transport.get_extra_info('sockname')[0]
-            await close_and_wait(writer)
+            writer.close()
 
             #FIXME: On MacOS it seems unable to bind to the local_addr unless it is set to localhost. weird
             #local_addr = '0.0.0.0'

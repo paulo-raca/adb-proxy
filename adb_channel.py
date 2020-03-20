@@ -27,7 +27,7 @@ async def open_stream(endpoint, *path):
         return reader, writer
 
     except:
-        await close_and_wait(writer)
+        writer.close()
         raise
 
 
@@ -37,7 +37,7 @@ async def read_stream(*args, **kwargs):
     try:
         return await reader.read()
     finally:
-        await close_and_wait(writer)
+        writer.close()
 
 async def list_adb_devices(endpoint):
     lines = (await read_stream(endpoint, "host:devices"))[4:].decode('utf-8').splitlines()
