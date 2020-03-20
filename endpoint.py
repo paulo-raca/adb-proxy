@@ -12,14 +12,15 @@ class Endpoint(ABC):
             local_addr = writer.get_extra_info('sockname')[0]
             await close_and_wait(writer)
 
-            #FIXME: On MacOS it seems unable to bind to the local_addr unless it is set to localhost. weird
-            local_addr = 'localhost'
-
             hostname = ssh_client._host or local_addr
             try:
                 hostname = (await ssh_client.run("hostname", stdin=asyncssh.DEVNULL, stderr=asyncssh.DEVNULL)).stdout.strip() or hostname
-            except:
+            except Exception as e:
+                print(e)
                 pass
+
+            #FIXME: On MacOS it seems unable to bind to the local_addr unless it is set to localhost. weird
+            #local_addr = '0.0.0.0'
 
             return SshEndpoint(hostname, ssh_client, local_addr, adb_sockaddr)
         else:
@@ -28,7 +29,7 @@ class Endpoint(ABC):
             await close_and_wait(writer)
 
             #FIXME: On MacOS it seems unable to bind to the local_addr unless it is set to localhost. weird
-            local_addr = 'localhost'
+            #local_addr = '0.0.0.0'
 
             return LocalEndpoint(socket.gethostname(), local_addr, adb_sockaddr)
 

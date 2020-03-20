@@ -114,7 +114,8 @@ class AdbProxy:
     """
     This represents a proxy connected to the local ADB server
     """
-    def __init__(self, reader, writer, device_endpoint, device_id, device_name, reverse_connection_supported=True):
+    def __init__(self, reader, writer, local_endpoint, device_endpoint, device_id, device_name, reverse_connection_supported=True):
+        self.local_endpoint = local_endpoint
         self.device_endpoint = device_endpoint
         self.device_id = device_id
         self.device_name = device_name
@@ -161,7 +162,7 @@ class AdbProxy:
 
     async def reverse_create(self, remote, local, local_id, remote_id):
         async def on_connected(r, w):
-            logger.info(f"Received a reverse connection! {local} -> {proxy} -> {remote}")
+            logger.info(f"Received a reverse connection: {tunnel_desc}")
 
             stream_id = self.next_local_id
             self.next_local_id += 1
@@ -173,6 +174,7 @@ class AdbProxy:
 
         listener, listen_addr = await self.device_endpoint.listen(on_connected)
         proxy = f"tcp:{hostport(listen_addr)}"
+        tunnel_desc = f"{remote} @ Device -> {proxy} @ {self.device_endpoint.local_hostname} -> {local} @ {self.local_endpoint.local_hostname}"
         cmd = f"reverse:forward:{remote};{proxy}"
 
         ret = await self.read_stream(cmd)
@@ -181,14 +183,14 @@ class AdbProxy:
             port = ret[8:]
             if (port):
                 remote = f"tcp:{int(port)}"
-            logger.info(f"Created reverse tunnel {remote} -> {proxy} -> {local}")
+            logger.info(f"Created reverse tunnel: {tunnel_desc}")
             old_listener = self.reverse_listeners.pop(remote, None)
             if old_listener:
-                logger.info(f"Closing previous reverse tunnel to {remote}: {old_listener}")
+                logger.info(f"Closing previous reverse tunnel to {remote}")
                 await close_and_wait(old_listener)
             self.reverse_listeners[remote] = listener
         else:
-            logger.warning(f"Failed to create reverse tunnel {remote} -> {proxy} -> {local}  -- {ret}")
+            logger.warning(f"Failed to create reverse tunnel: {tunnel_desc}")
             await close_and_wait(listener)
 
         await self.send_cmd(b'OKAY', local_id, remote_id)
@@ -202,7 +204,7 @@ class AdbProxy:
         if ret.startswith(b"OKAY"):
             old_listener = self.reverse_listeners.pop(remote, None)
             if old_listener:
-                logger.info(f"Closing reverse tunnel to {remote}: {old_listener}")
+                logger.info(f"Closing reverse tunnel to {remote}")
                 await close_and_wait(old_listener)
 
         await self.send_cmd(b'OKAY', local_id, remote_id)
@@ -211,7 +213,7 @@ class AdbProxy:
 
     async def reverse_remove_all(self, local_id, remote_id):
         for remote, old_listener in self.reverse_listeners.items():
-            logger.info(f"Closing reverse tunnel to {remote}: {old_listener}")
+            logger.info(f"Closing reverse tunnel to {remote}")
             await close_and_wait(old_listener)
         self.reverse_listeners.clear()
 
@@ -355,7 +357,7 @@ class AdbProxy:
 
         def on_connected(r, w):
             logger.info(f"Connected to ADB server @ {local_endpoint.local_hostname}")
-            proxy_task[0] = asyncio.create_task(AdbProxy(r, w, remote_endpoint, device_id, device_name, reverse_connection_supported).go())
+            proxy_task[0] = asyncio.create_task(AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_name, reverse_connection_supported).go())
 
         server, server_addr = await local_endpoint.listen(on_connected)
         addr = hostport(server_addr)
