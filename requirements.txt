@@ -4,3 +4,4 @@ uri>=2.0.1
 miniupnpc>=2.0.2
 aioboto3>=6.4.1
 aiohttp>=3.6.2
+PyYAML>=5.1.2
