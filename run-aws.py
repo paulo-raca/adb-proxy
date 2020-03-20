@@ -76,9 +76,9 @@ async def main():
     parser.add_argument("--project", dest='project_name', default="Remote Debug", help="Project Name")
     parser.add_argument("--device-pool", dest='device_pool', default="Default Pool", help="Device Pool")
 
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--upnp", action='store_true', help="Uses UPNP to setup the firewall to allow incoming connections")
-    group.add_argument("listen_address", type=ssh_config, nargs='?', default={}, help="Local address that the ADB-Proxy will listen on. Must be able to receive connections from public internet")
+    parser.add_argument("--upnp", action='store_true', help="Uses UPNP to setup the firewall to allow incoming connections")
+    parser.add_argument("listen_address", type=ssh_config, nargs='?', default={}, help="Local address that the ADB-Proxy will listen on. Must be able to receive connections from public internet")
+    parser.add_argument("-J", "--ssh-tunnel", dest="ssh_tunnels", action="append", type=ssh_config, help="Add a SSH jump host to access the remote address")
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
@@ -99,7 +99,7 @@ async def main():
     async def wait_for(socket_addr, ssh_client):
         await run_sync(run, args.project_name, args.device_pool, socket_addr, upnp)
 
-    await adb_proxy.listen_reverse(args.listen_address, wait_for=wait_for)
+    await adb_proxy.use_ssh_tunnels(ssh_tunnels=args.ssh_tunnels, func=adb_proxy.listen_reverse, listen_address=args.listen_address, wait_for=wait_for)
 
 if __name__ == "__main__":
     asyncio_run(main())

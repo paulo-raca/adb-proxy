@@ -495,11 +495,11 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
 
 
 
-async def use_ssh_tunnels(func, ssh_tunnels=[], ssh_client=None, **kwargs):
+async def use_ssh_tunnels(func, ssh_tunnels=[], ssh_client=None, *args, **kwargs):
     if ssh_tunnels:
         async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
             logger.info(f"Jumping through SSH proxy: {ssh_tunnels[0]}")
-            return await use_ssh_tunnels(func=func, ssh_tunnels=ssh_tunnels[1:], ssh_client=ssh_client, **kwargs)
+            return await use_ssh_tunnels(ssh_tunnels=ssh_tunnels[1:], ssh_client=ssh_client, func=func, *args, **kwargs)
 
     return await func(ssh_client=ssh_client, **kwargs)
 
