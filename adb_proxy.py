@@ -246,11 +246,11 @@ class AdbProxy:
 
             hostshell_prefix = "shell:hostshell"
             if name == hostshell_prefix or name.startswith(hostshell_prefix + " "):
-                command = name[len(hostshell_prefix)+1:]
+                command = name[len(hostshell_prefix)+1:].strip() or None
                 print(f"command={command}")
-
-
-            reader, writer = await self.open_stream(name)
+                reader, writer = await self.device_endpoint.shell(command)
+            else:
+                reader, writer = await self.open_stream(name)
             logger.info(f"{local_id}[{name}] opened")
 
             stream = AdbProxyChannel(self, name, local_id, remote_id, reader, writer)
@@ -278,6 +278,7 @@ class AdbProxy:
                     logger.warning(f"Expected CNXN, got {cmd}")
                 else:
                     self.protocol_version = min(self.protocol_version, arg0)
+                    logger.debug(f"Using protocol version: 0x{self.protocol_version:x}")
                     self.max_data_len = min(self.max_data_len, arg1)
                     break
 

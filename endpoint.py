@@ -49,9 +49,9 @@ class Endpoint(ABC):
     async def listen(self, on_connected):
         pass
 
-    #@abstractmethod
-    #async def exec(self, on_connected):
-        #pass
+    @abstractmethod
+    async def shell(self, command, pty=True):
+        pass
 
 
 
@@ -68,6 +68,10 @@ class SshEndpoint(Endpoint):
         print("Listening on", self.local_addr, server.get_port())
         return server, (self.local_addr, server.get_port())
 
+    async def shell(self, command, pty=True):
+        proc = await self.ssh_client.create_process(command, stdin=asyncssh.PIPE, stdout=asyncssh.PIPE, stderr=asyncssh.STDOUT, encoding=None, term_type='xterm-color' if pty else None)
+        return proc.stdout, proc.stdin
+
 
 
 class LocalEndpoint(Endpoint):
@@ -80,3 +84,8 @@ class LocalEndpoint(Endpoint):
     async def listen(self, on_connected):
         server = await asyncio.start_server(on_connected, self.local_addr, 0)
         return server, server.sockets[0].getsockname()
+
+    async def shell(self, command, pty=True):
+        # TODO: Support PTY
+        proc = await asyncio.create_subprocess_shell(command, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, encoding=None)
+        return proc.stdout, proc.stdin
