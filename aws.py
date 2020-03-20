@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # PYTHON_ARGCOMPLETE_OK
-import devicefarm as df
 from util import *
 import aiobotocore
 import logging
