@@ -388,7 +388,7 @@ async def connect(device_id, adb_reverse_supported=True, share=False, host_adb_a
     return await AdbProxy.attach_raw(local_endpoint, remote_endpoint, device_id, adb_reverse_supported)
 
 
-async def listen_reverse(listen_address, ssh_client=None, **kwargs):
+async def listen_reverse(listen_address, ssh_client=None, wait_for=None, **kwargs):
     listen_address.setdefault("username", "adb-proxy")
     listen_address.setdefault("host", "localhost")
     listen_address.setdefault("port", 0)
@@ -400,27 +400,47 @@ async def listen_reverse(listen_address, ssh_client=None, **kwargs):
         def auth_banner_received(self, msg, lang):
             self.conn.set_extra_info(attach_opts=json.loads(msg))
 
+    connections = set()
+
     async def on_connected(ssh_client):
-        attach_opts = ssh_client.get_extra_info('attach_opts')
-        async with ssh_client:
-            logger.info(f"Reverse connection received")
-            try:
+        async def connect_task():
+            attach_opts = ssh_client.get_extra_info('attach_opts')
+            async with ssh_client:
                 await connect(ssh_client=ssh_client, **kwargs, **attach_opts)
+
+        logger.info(f"Reverse connection received")
+        async with ssh_client:
+            task = asyncio.create_task(connect_task())
+            connections.add(task)
+            try:
+                await task
             finally:
+                connections.remove(task)
                 logger.info(f"Reverse connection lost")
 
-    server = await asyncssh.listen_reverse(
-            tunnel = ssh_client,
-            client_factory = MySSHClient,
-            acceptor = on_connected,
-            **listen_address)
-    async with server:
-        try:
-            socket_addr = server.sockets[0].getsockname()
-        except:
-            socket_addr = (listen_address["host"], server.get_port())
-        logger.info(f"Listening for reverse connections: {listen_address['username']}@{socket_addr[0]}:{socket_addr[1]}")
-        await asyncio.Semaphore(0).acquire()
+    try:
+        server = await asyncssh.listen_reverse(
+                tunnel = ssh_client,
+                client_factory = MySSHClient,
+                acceptor = on_connected,
+                **listen_address)
+        async with server:
+            try:
+                socket_addr = server.sockets[0].getsockname()
+            except:
+                socket_addr = (listen_address["host"], server.get_port())
+            logger.info(f"Listening for reverse connections: {listen_address['username']}@{socket_addr[0]}:{socket_addr[1]}")
+
+            if wait_for:
+                await wait_for(socket_addr, ssh_client=ssh_client)
+            else:
+                # Block until cancel
+                await asyncio.Semaphore(0).acquire()
+    finally:
+        # Finish any pending connections
+        for task in connections:
+            task.cancel()
+        await asyncio.tasks.gather(*connections)
 
 
 async def connect_reverse(server_address, ssh_client=None, **kwargs):
