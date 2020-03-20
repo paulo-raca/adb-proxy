@@ -42,6 +42,8 @@ user@mycomputer$ ./adb_proxy.py listen-reverse mycomputer:port      # e.g.: 1.2.
 user@othercomputer$ ./adb_proxy.py connect-reverse -s device_serial mycomputer:port
 ```
 
+#### SSH Jumps
+
 If the `mycomputer` is not directly reachable from `othercomputer` you cannot add SSH jumps (`-J`) along the way. Some examples:
 
 ```bash
@@ -62,28 +64,37 @@ user@mycomputer$ ./adb_proxy.py listen-reverse gatewaycomputer:port -J user@gate
 user@othercomputer$ ./adb_proxy.py connect-reverse -s device_serial gatewaycomputer:port
 ```
 
+#### UPnP Gateways
+
+If you are behind a NAT and your router has UPnP enabled, `--upnp` can be used to automatically setup port forwarding on your gateway from public internet
+user@mycomputer$ ./adb_proxy.py listen-reverse --upnp
+user@othercomputer$ ./adb_proxy.py connect-reverse gateway_ip:gateway_port  # listen-reverse shows the gateway IP and Port
+
+
 ### DeviceFarm
 
-DeviceFarm is a special type of reverse connection: We cannot access the computer attached to the devices, but we can run commands on it.
+[DeviceFarm](https://aws.amazon.com/pt/device-farm/) is an AWS service for automatic testing of Android and iOS apps.
 
-We set up the local machine to `listen-reverse` on a public IP address and execute `connect-reverse` on the DeviceFarm `TestSpec`
+Using reverse connections and a special test spec, it is possible to attach to a remote device:
 
-There is helper subcommand that performs `listen-reverse` and schedules a new Job on DeviceFarm:
+To use it, ensure you have:
+
+  - `~/.aws/config` file setup with your region and access keys
+  - A project created on DeviceFarm
+  - A device pool with the device you want to attach to
+
+The connectivity options are the same as those for reverse connections
 
 ```bash
-user@mycomputer$ ./adb_proxy.py device-farm my_ip:port  # Assuming my_ip is available externally
+user@mycomputer$ ./adb_proxy.py device-farm --project="MyProject" --device-pool="MyPool" my_ip:port  # Assuming my_ip is available externally
 ```
 
 ```bash
-user@mycomputer$ ./adb_proxy.py device-farm gateway_ip:port -J user@gatewaycomputer  # Assuming gateway_ip is available externally
+user@mycomputer$ ./adb_proxy.py device-farm --project="MyProject" --device-pool="MyPool" gateway_ip:port -J user@gatewaycomputer  # Assuming gateway_ip is available externally
 ```
 
-#### UPnP
-
-For those of us acessing the internet behind a UPnP-capable NAT, we can simply:
-
 ```bash
-user@mycomputer$ ./adb_proxy.py device-farm --upnp  # Will automatically set port forwarding from a public ip
+user@mycomputer$ ./adb_proxy.py device-farm --project="MyProject" --device-pool="MyPool" gateway_ip:port --upnp  # Will automatically set port forwarding from a public ip
 ```
 
 ## Iteractive session with `scrcpy`
