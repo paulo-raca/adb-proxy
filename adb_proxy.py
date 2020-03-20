@@ -356,7 +356,7 @@ class AdbProxy:
 
         proxy_task = [None]
 
-        def on_connected(r, w):
+        async def on_connected(r, w):
             logger.info(f"Connected to ADB server {hostport(local_endpoint.adb_sockaddr)} @ {local_endpoint.local_hostname}")
             proxy_task[0] = asyncio.create_task(AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_name, reverse_connection_supported).go())
 
@@ -438,10 +438,10 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, **kwarg
                 **listen_address)
         async with server:
             try:
-                socket_addr = server.sockets[0].getsockname()
+                socket_addr = (listen_address['username'], server.sockets[0].getsockname()[0], server.sockets[0].getsockname()[1])
             except:
-                socket_addr = (listen_address["host"], server.get_port())
-            logger.info(f"Listening for reverse connections: {listen_address['username']}@{socket_addr[0]}:{socket_addr[1]}")
+                socket_addr = (listen_address['username'], listen_address["host"], server.get_port())
+            logger.info(f"Listening for reverse connections: {userhostport(socket_addr)}")
 
             if wait_for:
                 await wait_for(socket_addr, ssh_client=ssh_client)

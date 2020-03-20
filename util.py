@@ -1,5 +1,7 @@
 import asyncio
 import uri
+import string
+import random
 import signal
 
 async def check_call(program, *args, **kwargs):
@@ -36,6 +38,16 @@ def ssh_config(config):
 def hostport(sockaddr):
     return uri.URI(hostname=sockaddr[0], port=sockaddr[1]).uri[2:-1]
 
+def userhostport(sockaddr):
+    return uri.URI(username=sockaddr[0], hostname=sockaddr[1], port=sockaddr[2]).uri[2:-1]
+
+def random_str(size=6, chars=string.ascii_uppercase + string.ascii_lowercase + string.digits):
+    return ''.join(random.choice(chars) for x in range(size))
+
+async def run_sync(func, *args, **kwargs):
+    # FIXME: run_in_executor ignores cancellations -- Should send SIGINT to the thread instead
+    return await asyncio.get_running_loop().run_in_executor(None, lambda: func(*args, **kwargs))
+
 
 def asyncio_run(main, *, debug=True):
     if asyncio.events._get_running_loop() is not None:
@@ -62,7 +74,11 @@ def asyncio_run(main, *, debug=True):
 
 
 def _cancel_all_tasks(loop):
-    to_cancel = asyncio.tasks.all_tasks(loop)
+    try:
+        to_cancel = asyncio.tasks.all_tasks(loop)
+    except:
+        to_cancel = []
+
     if not to_cancel:
         return
 

@@ -1,3 +1,4 @@
 asyncssh>=2.1.0
 argcomplete>=1.10.3
-uri==2.0.1
+uri>=2.0.1
+miniupnpc>=2.0.2
