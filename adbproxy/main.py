@@ -39,9 +39,10 @@ async def main():
     parser_df.set_defaults(func=devicefarm)
 
     argcomplete.autocomplete(parser)
-    args = parser.parse_args()
+    args = parser.parse_args().__dict__
+    del args["cmd"]
 
-    await use_tunnels(**args.__dict__)
+    await use_tunnels(**args)
 
 
 def main_sync():
