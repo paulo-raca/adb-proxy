@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # PYTHON_ARGCOMPLETE_OK
-from util import *
 import aiobotocore
 import logging
 import aiohttp
 import yaml
 import re
+import os
+from pkg_resources import resource_string
+
+from .util import *
 
 logger = logging.getLogger('DeviceFarm')
 logger.setLevel(logging.INFO)
@@ -119,8 +122,7 @@ async def run(project_name, devicepool_name, ssh_path):
 
         uploads_to_delete = []
         try:
-            with open("dummy.apk", "rb") as f:
-                dummy_apk = f.read()
+            dummy_apk = resource_string(__name__, "dummy.apk")
 
             test_spec = {
                 "version": 0.1,

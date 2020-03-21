@@ -1,4 +1,4 @@
-from util import *
+from .util import *
 
 def device_path(device_id):
     return f"host:transport:{device_id}"

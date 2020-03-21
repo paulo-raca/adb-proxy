@@ -59,13 +59,10 @@ def asyncio_run(main, *, debug=True):
     asyncio.events.set_event_loop(loop)
     try:
         asyncio.get_event_loop().run_until_complete(task)
+    except asyncio.CancelledError:
+        print("Cancelled")
     finally:
-        #ex = task.exception()
-        try:
-            _cancel_all_tasks(loop)
-        finally:
-            asyncio.events.set_event_loop(None)
-            loop.close()
+        _cancel_all_tasks(loop)
 
 
 def _cancel_all_tasks(loop):

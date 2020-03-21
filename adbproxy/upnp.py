@@ -1,6 +1,6 @@
 import miniupnpc
-from util import *
 import logging
+from .util import *
 
 logger = logging.getLogger('UPnP')
 logger.setLevel(logging.INFO)
