@@ -27,7 +27,7 @@ When ADB-Proxy is running, the device appears to be attached to both computers
 The easiest way is to have SSH access to the desired remote machine:
 
 ```bash
-user@mycomputer$ ./adb_proxy.py connect -s device_serial -J me@othercomputer
+user@mycomputer$ adbproxy connect -s device_serial -J me@othercomputer
 ```
 
 To attach the device identified by `device_serial`, attached to `othercomputer` to the local computer.
@@ -38,38 +38,40 @@ Unfortunately a direct connection is sometimes impossible. In this case, you can
 computer and start a reverse connection from the remote end:
 
 ```bash
-user@mycomputer$ ./adb_proxy.py listen-reverse mycomputer:port      # e.g.: 1.2.3.4:5678
-user@othercomputer$ ./adb_proxy.py connect-reverse -s device_serial mycomputer:port
+user@mycomputer$ adbproxy listen-reverse mycomputer:port      # e.g.: 1.2.3.4:5678
+user@othercomputer$ adbproxy connect-reverse -s device_serial mycomputer:port
 ```
 
 #### SSH Jumps
 
-If the `mycomputer` is not directly reachable from `othercomputer` you cannot add SSH jumps (`-J`) along the way. Some examples:
+If the `mycomputer` is not directly reachable from `othercomputer` you can add SSH jumps (`-J`) along the way. Some examples:
 
 ```bash
 # Both computers reach gatewaycomputer by SSH and use it as an intermediary
-user@mycomputer$ ./adb_proxy.py listen-reverse localhost:port -J user@gatewaycomputer
-user@othercomputer$ ./adb_proxy.py connect-reverse -s device_serial localhost:port -J user@gatewaycomputer
+user@mycomputer$ adbproxy listen-reverse localhost:port -J user@gatewaycomputer
+user@othercomputer$ adbproxy connect-reverse -s device_serial localhost:port -J user@gatewaycomputer
 ```
 
 ```bash
 # othercomputer can reach mycomputer over SSH
-user@mycomputer$ ./adb_proxy.py listen-reverse mycomputer:port
-user@othercomputer$ ./adb_proxy.py connect-reverse -s device_serial localhost:port -J user@mycomputer
+user@mycomputer$ adbproxy listen-reverse mycomputer:port
+user@othercomputer$ adbproxy connect-reverse -s device_serial localhost:port -J user@mycomputer
 ```
 
 ```bash
 # othercomputer can reach gatewaycomputer directly (gatewaycomputer must be configured with `GatewayPorts yes`)
-user@mycomputer$ ./adb_proxy.py listen-reverse gatewaycomputer:port -J user@gatewaycomputer
-user@othercomputer$ ./adb_proxy.py connect-reverse -s device_serial gatewaycomputer:port
+user@mycomputer$ adbproxy listen-reverse gatewaycomputer:port -J user@gatewaycomputer
+user@othercomputer$ adbproxy connect-reverse -s device_serial gatewaycomputer:port
 ```
 
 #### UPnP Gateways
 
 If you are behind a NAT and your router has UPnP enabled, `--upnp` can be used to automatically setup port forwarding on your gateway from public internet
-user@mycomputer$ ./adb_proxy.py listen-reverse --upnp
-user@othercomputer$ ./adb_proxy.py connect-reverse gateway_ip:gateway_port  # listen-reverse shows the gateway IP and Port
 
+```bash
+user@mycomputer$ adbproxy listen-reverse --upnp
+user@othercomputer$ adbproxy connect-reverse gateway_ip:gateway_port  # listen-reverse shows the gateway IP and Port
+```
 
 ### DeviceFarm
 
@@ -86,15 +88,15 @@ To use it, ensure you have:
 The connectivity options are the same as those for reverse connections
 
 ```bash
-user@mycomputer$ ./adb_proxy.py device-farm --project="MyProject" --device-pool="MyPool" my_ip:port  # Assuming my_ip is available externally
+user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPool" my_ip:port  # Assuming my_ip is available externally
 ```
 
 ```bash
-user@mycomputer$ ./adb_proxy.py device-farm --project="MyProject" --device-pool="MyPool" gateway_ip:port -J user@gatewaycomputer  # Assuming gateway_ip is available externally
+user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPool" gateway_ip:port -J user@gatewaycomputer  # Assuming gateway_ip is available externally
 ```
 
 ```bash
-user@mycomputer$ ./adb_proxy.py device-farm --project="MyProject" --device-pool="MyPool" gateway_ip:port --upnp  # Will automatically set port forwarding from a public ip
+user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPool" --upnp  # Will automatically set port forwarding from a public ip
 ```
 
 ## Iteractive session with `scrcpy`
