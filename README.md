@@ -73,6 +73,18 @@ user@mycomputer$ adbproxy listen-reverse --upnp
 user@othercomputer$ adbproxy connect-reverse gateway_ip:gateway_port  # listen-reverse shows the gateway IP and Port
 ```
 
+#### Ngrok
+If your computer cannot be reached directly (You are behind a NAT or firewall), your router doesn't support UPnP, you cannot set up port forwarding directly and
+don't have access to an SSH server to use as a gateway.... We can fallback to using Ngrok as a gateway.
+
+Go to ngrok.com, create an account and setup your SSH key. Now you can run with `--ngrok`:
+
+```bash
+user@mycomputer$ adbproxy listen-reverse --ngrok
+user@othercomputer$ adbproxy connect-reverse ngrok_host:ngrok_port  # listen-reverse shows the Host and Port to use
+```
+
+
 ### DeviceFarm
 
 [DeviceFarm](https://aws.amazon.com/pt/device-farm/) is an AWS service for automatic testing of Android and iOS apps.
@@ -97,6 +109,10 @@ user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPoo
 
 ```bash
 user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPool" --upnp  # Will automatically set port forwarding from a public ip
+```
+
+```bash
+user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPool" --ngrok  # Will automatically use ngrok as  a gateway
 ```
 
 ## Iteractive session with `scrcpy`
