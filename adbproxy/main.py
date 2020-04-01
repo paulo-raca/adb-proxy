@@ -17,8 +17,9 @@ async def main():
     hostinfo_parser.add_argument("--host-adb-server", dest="host_adb_addr", type=sockaddr, default=("localhost", 5037), help="Socket address of ADB server away from the device")
 
     listen_reverser_base_parser = argparse.ArgumentParser(add_help=False, parents=[hostinfo_parser, ssh_jump_parser])
-    listen_reverser_base_parser.add_argument("listen_address", type=ssh_config, nargs='?', default={}, help="Server address where the reverse SSH server will be bound")
+    listen_reverser_base_parser.add_argument("listen_address", type=ssh_config, nargs='?', default={"host": "0.0.0.0"}, help="Server address where the reverse SSH server will be bound")
     listen_reverser_base_parser.add_argument("--upnp", action='store_true', help="Uses UPNP to setup the Internet Gateway to receive incoming connections")
+    listen_reverser_base_parser.add_argument("--ngrok", dest="ssh_tunnels", action="append_const", const={"host": "tunnel.us.ngrok.com", "port": 22, "known_hosts": None, "password": ''}, help="Uses Ngrok as a Gateway")
 
     subparsers = parser.add_subparsers(help='commands', dest='cmd')
     subparsers.required = True

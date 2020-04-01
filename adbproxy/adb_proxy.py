@@ -21,7 +21,10 @@ import asyncssh
 import struct
 import binascii
 import logging
+import re
 import signal
+import sys
+import traceback
 
 from .adb_channel import *
 from .util import *
@@ -409,6 +412,14 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
         listen_address["host"] = upnp.lan_ip
         listen_address["port"] = 0
 
+    if ssh_client and ssh_client._host.endswith(".ngrok.com"):
+        logger.info(f"Setting up ngrok for TCP")
+        listen_address["host"] = "localhost"
+        listen_address["port"] = 0
+        ngrok_cmd = await ssh_client.create_process("tcp", stdin=asyncssh.DEVNULL, stdout=asyncssh.PIPE, stderr=asyncssh.DEVNULL)
+    else:
+        ngrok_cmd = None
+
     listen_address.setdefault("username", "adb-proxy")
     listen_address.setdefault("host", "localhost")
     listen_address.setdefault("port", 0)
@@ -434,6 +445,8 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
             connections.add(task)
             try:
                 await task
+            except:
+                traceback.print_exc()
             finally:
                 connections.remove(task)
                 logger.info(f"Reverse connection lost")
@@ -445,10 +458,38 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                 acceptor = on_connected,
                 **listen_address)
         async with server:
-            try:
-                socket_addr = (listen_address['username'], server.sockets[0].getsockname()[0], server.sockets[0].getsockname()[1])
-            except:
-                socket_addr = (listen_address['username'], listen_address["host"], server.get_port())
+            if ssh_client is None:
+                # Listening on a plain TCP socket
+                socket_addr = [listen_address['username'], server.sockets[0].getsockname()[0], server.sockets[0].getsockname()[1]]
+
+                if socket_addr[1] in ["0.0.0.0", "::"]:
+                    try:
+                        reader, writer = await asyncio.open_connection("example.com", 80)
+                        socket_addr[1] = writer.transport.get_extra_info('sockname')[0]
+                        writer.close()
+                    except:
+                        logger.warning(f"Cannot get server's real IP")
+
+            else:
+                # Listening through a SSH tunnel
+                socket_addr = [listen_address['username'], listen_address["host"], server.get_port()]
+
+                if ngrok_cmd:
+                    async for row in ngrok_cmd.stdout:
+                        row = row.strip()
+                        logger.info(f"ngrok: {row}")
+                        match = re.match('Forwarding  tcp://(.*):(.*)', row)
+                        if (match):
+                            socket_addr[1] = match.group(1)
+                            socket_addr[2] = int(match.group(2))
+                            break
+
+                elif socket_addr[1] in ["0.0.0.0", "::"]:
+                    try:
+                        socket_addr[1] = ssh_client._peer_addr
+                    except:
+                        logger.warning(f"Cannot get server's real IP")
+
 
             async def wait_until_complete():
                 logger.info(f"Listening for reverse connections: {userhostport(socket_addr)}")

@@ -7,28 +7,20 @@ class Endpoint(ABC):
     @staticmethod
     async def of(adb_sockaddr, ssh_client=None):
         if ssh_client:
-            reader, writer = await ssh_client.open_connection(remote_host=adb_sockaddr[0], remote_port=adb_sockaddr[1])
-            local_addr = writer.get_extra_info('sockname')[0]
-            writer.close()
-
-            hostname = ssh_client._host or local_addr
             try:
                 hostname = (await ssh_client.run("hostname", stdin=asyncssh.DEVNULL, stderr=asyncssh.DEVNULL)).stdout.strip() or hostname
             except Exception as e:
-                print(e)
-                pass
+                hostname = None
 
-            #FIXME: On MacOS it seems unable to bind to the local_addr unless it is set to localhost. weird
-            #local_addr = '0.0.0.0'
+            # FIXME: Can we figure out the IP that would be used to connect to `adb_sockaddr` ?
 
-            return SshEndpoint(hostname, ssh_client, local_addr, adb_sockaddr)
+            addr = ssh_client._peer_addr
+            hostname = hostname or ssh_client._host or addr
+            return SshEndpoint(hostname, ssh_client, addr, adb_sockaddr)
         else:
             reader, writer = await asyncio.open_connection(adb_sockaddr[0], adb_sockaddr[1])
             local_addr = writer.transport.get_extra_info('sockname')[0]
             writer.close()
-
-            #FIXME: On MacOS it seems unable to bind to the local_addr unless it is set to localhost. weird
-            #local_addr = '0.0.0.0'
 
             return LocalEndpoint(socket.gethostname(), local_addr, adb_sockaddr)
 
