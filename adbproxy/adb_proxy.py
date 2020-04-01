@@ -445,7 +445,10 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
             connections.add(task)
             try:
                 await task
-            except:
+            except asyncio.CancelledError as e:
+                pass
+            except Exception as e:
+                logger.warning(f"Lost connection: {e}")
                 traceback.print_exc()
             finally:
                 connections.remove(task)
@@ -462,9 +465,14 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                 # Listening on a plain TCP socket
                 socket_addr = [listen_address['username'], server.sockets[0].getsockname()[0], server.sockets[0].getsockname()[1]]
 
-                if socket_addr[1] in ["0.0.0.0", "::"]:
+                test_addrs = {
+                    "0.0.0.0": ("ipv4.lookup.test-ipv6.com", 443),
+                    "::": ("ipv6.lookup.test-ipv6.com", 443),
+                }
+                test_addr = test_addrs.get(socket_addr[1], None)
+                if test_addr is not None:
                     try:
-                        reader, writer = await asyncio.open_connection("example.com", 80)
+                        reader, writer = await asyncio.open_connection(test_addr[0], test_addr[1])
                         socket_addr[1] = writer.transport.get_extra_info('sockname')[0]
                         writer.close()
                     except:
