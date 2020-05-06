@@ -129,16 +129,12 @@ async def run(project_name, devicepool_name, ssh_path):
                 "phases": {
                     "install": {
                         "commands": [
-                            "lsb_release -a",
-                            "uname -a",
-                            "wget -q http://cs-mobile-sample-apks-shared.s3-us-west-1.amazonaws.com/aws-tools/localpython.tar.gz",
-                            "tar -xf localpython.tar.gz",
-                            "$PWD/localpython/bin/python3 -m pip install git+https://github.com/paulo-raca/adb-proxy.git"
+                            "python3.7 -m pip install --user git+https://github.com/paulo-raca/adb-proxy.git"
                         ],
                     },
                     "test": {
                         "commands": [
-                            f'$PWD/localpython/bin/python3 -m adbproxy connect-reverse --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{userhostport(ssh_path)}"'
+                            f'python3.7 -m adbproxy connect-reverse --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{userhostport(ssh_path)}"'
                         ]
                     },
                 }
