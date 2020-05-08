@@ -15,8 +15,8 @@ While this setup works fine for local development, sometimes I need to access a 
 
 To address this scenario, ADB-Proxy connects to 2 ADB servers and intermediates communication between them:
 
-- On the local computer, it acts as a local device
-- On the remove server, it acts as an application and that communicates with a specific device device
+- On the local computer, it acts as a local device, connected via TCP.
+- On the remove server, it acts as an application and that communicates with a specific device.
 
 When ADB-Proxy is running, the device appears to be attached to both computers
 
