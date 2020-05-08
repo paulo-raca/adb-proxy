@@ -117,7 +117,7 @@ user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPoo
 
 ## Iteractive session with `scrcpy`
 
-ADB connection is nice and all, but an interactive screen were you can click is essential!
+ADB connection is nice and all, but an interactive screen that you can see and click is essential!
 
 I highly recomend [Genymobile's scrcpy](https://github.com/Genymobile/scrcpy) to fill that gap.
 
