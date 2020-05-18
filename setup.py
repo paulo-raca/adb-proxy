@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='adbproxy',
-    version='1.0.2',
+    version='1.0.3',
     author="Paulo Costa",
     author_email="me@paulo.costa.nom.br",
     description="Creates an ADB bridge between your computer and a device somewhere else",
