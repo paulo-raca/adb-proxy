@@ -129,16 +129,19 @@ async def run(project_name, devicepool_name, ssh_path):
                 "phases": {
                     "install": {
                         "commands": [
+                            #"wget -q http://cs-mobile-sample-apks-shared.s3-us-west-1.amazonaws.com/aws-tools/python3.6-prebuilt.tar.gz",
+                            #"tar -xf python3.6-prebuilt.tar.gz",  # Executable at "$PWD/python3.6-prebuilt/bin/python3"
+                            "virtualenv3 $(pwd)/env3",
+                            ". env3/bin/activate",
                             "lsb_release -a",
                             "uname -a",
-                            "wget -q http://cs-mobile-sample-apks-shared.s3-us-west-1.amazonaws.com/aws-tools/python3.6-prebuilt.tar.gz",
-                            "tar -xf python3.6-prebuilt.tar.gz",
-                            "$PWD/python3.6-prebuilt/bin/python3 -m pip install git+https://github.com/paulo-raca/adb-proxy.git"
+                            "python -V",
+                            "python -m pip install git+https://github.com/paulo-raca/adb-proxy.git"
                         ],
                     },
                     "test": {
                         "commands": [
-                            f'$PWD/python3.6-prebuilt/bin/python3 -m adbproxy connect-reverse --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{userhostport(ssh_path)}"'
+                            f'python -m adbproxy connect-reverse --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{userhostport(ssh_path)}"'
                         ]
                     },
                 }
