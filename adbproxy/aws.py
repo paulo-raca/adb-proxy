@@ -78,16 +78,62 @@ async def find_project(client, project_name):
     async for page in client.get_paginator("list_projects").paginate():
         for project in page["projects"]:
             if project["name"] == project_name:
+                logger.info(f'Using project {project_name}: {project["arn"]}')
                 return project["arn"]
     raise KeyError(f"Project not found: {project_name}")
 
 
-async def find_devicepool(client, project_arn, devicepool_name):
+async def find_devicepool(client, project_arn, device_pool):
     async for page in client.get_paginator("list_device_pools").paginate(arn=project_arn):
         for devicepool in page["devicePools"]:
-            if devicepool["name"] == devicepool_name:
+            if devicepool["name"] == device_pool:
+                logger.info(f'Using device pool {device_pool}: {devicepool["arn"]}')
                 return devicepool["arn"]
-    raise KeyError(f"Devicepool not found: {devicepool_name}")
+    raise KeyError(f"Devicepool not found: {device_pool}")
+
+async def find_device(client, project_arn, device_id):
+    devices = []  # (name, arn)
+    devices_instances = []  # (name, arn)
+    async for page in client.get_paginator("list_devices").paginate(arn=project_arn):
+        for device in page["devices"]:
+            device_name = device["name"]
+            device_name_os = f'{device["name"]} ({device["os"]})'
+            device_arn = device["arn"]
+            device_arn_suffix = device["arn"].split(":")[-1]
+
+            if device_id in [device_name, device_name_os, device_arn, device_arn_suffix]:
+                devices.append((device_name_os, device_arn))
+
+            for instance in device.get('instances', []):
+                instance_arn = instance['arn']
+                instance_arn_suffix = instance["arn"].split(":")[-1]
+                device_name_os_instance = f'{device["name"]} ({device["os"]}) ({instance_arn_suffix})'
+
+                if device_id in [instance_arn, instance_arn_suffix, device_name_os_instance]:
+                    devices_instances.append((device_name_os_instance, instance_arn))
+
+    if devices_instances:
+        names = ", ".join(name for name, arn in devices_instances)
+        arns = ", ".join(arn for name, arn in devices_instances)
+        filters = [{
+            "attribute": "INSTANCE_ARN",
+            "operator": "IN",
+            "values": [arn for name, arn in devices_instances]
+        }]
+        logger.info(f'Using device {names}: {arns}')
+        return filters
+    elif devices:
+        names = ", ".join(name for name, arn in devices)
+        arns = ", ".join(arn for name, arn in devices)
+        filters = [{
+            "attribute": "ARN",
+            "operator": "IN",
+            "values": [arn for name, arn in devices]
+        }]
+        logger.info(f'Using device instances {names}: {arns}')
+        return filters
+    else:
+        raise KeyError(f"Device not found: {device_id}")
 
 
 async def upload(client, http_session, project_arn, uploads_to_delete, name, type, data):
@@ -112,13 +158,22 @@ async def upload(client, http_session, project_arn, uploads_to_delete, name, typ
 
 
 
-async def run(project_name, devicepool_name, ssh_path):
+async def run(project_name, device_id, device_pool, ssh_path):
     async with aiobotocore.get_session().create_client('devicefarm') as client, \
                aiohttp.ClientSession() as http_session:
         project_arn = await find_project(client, project_name)
-        devicepool_arn = await find_devicepool(client, project_arn, devicepool_name)
-        logger.info(f"Project ARN: {project_arn}")
-        logger.info(f"Device pool ARN: {devicepool_arn}")
+
+        if device_id is not None:
+            device_filter = {
+                "deviceSelectionConfiguration": {
+                    "filters": await find_device(client, project_arn, device_id),
+                    "maxDevices": 999
+                }
+            }
+        else:
+            device_filter = {
+                "devicePoolArn": await find_devicepool(client, project_arn, device_pool)
+            }
 
         uploads_to_delete = []
         try:
@@ -156,7 +211,6 @@ async def run(project_name, devicepool_name, ssh_path):
             run_config = {
                 "name": "ADB Bridge",
                 "projectArn": project_arn,
-                "devicePoolArn": devicepool_arn,
                 "appArn": main_apk_arn,
                 "test": {
                     "type": "INSTRUMENTATION",
@@ -168,6 +222,7 @@ async def run(project_name, devicepool_name, ssh_path):
                     "videoCapture": True,
                 }
             }
+            run_config.update(device_filter)
 
             run = (await client.schedule_run(**run_config))["run"]
             logger.info(f"Job created: {arn_to_url(run['arn'])}")
