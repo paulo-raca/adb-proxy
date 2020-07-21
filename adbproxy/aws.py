@@ -91,7 +91,7 @@ async def find_devicepool(client, project_arn, device_pool):
                 return devicepool["arn"]
     raise KeyError(f"Devicepool not found: {device_pool}")
 
-async def find_device(client, project_arn, device_id):
+async def find_devices(client, project_arn, device_id):
     devices = []  # (name, arn)
     devices_instances = []  # (name, arn)
     async for page in client.get_paginator("list_devices").paginate(arn=project_arn):
@@ -166,7 +166,7 @@ async def run(project_name, device_id, device_pool, ssh_path):
         if device_id is not None:
             device_filter = {
                 "deviceSelectionConfiguration": {
-                    "filters": await find_device(client, project_arn, device_id),
+                    "filters": await find_devices(client, project_arn, device_id),
                     "maxDevices": 999
                 }
             }
