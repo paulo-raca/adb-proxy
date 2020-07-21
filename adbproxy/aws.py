@@ -91,9 +91,13 @@ async def find_devicepool(client, project_arn, device_pool):
                 return devicepool["arn"]
     raise KeyError(f"Devicepool not found: {device_pool}")
 
-async def find_devices(client, project_arn, device_id):
-    devices = []  # (name, arn)
-    devices_instances = []  # (name, arn)
+async def find_devices(client, project_arn, device_ids):
+    unmatched_ids = set(device_ids)
+
+    matched_device_names = []
+    matched_device_arns = []
+    matched_instance_names = []
+    matched_instance_arns = []
     async for page in client.get_paginator("list_devices").paginate(arn=project_arn):
         for device in page["devices"]:
             device_name = device["name"]
@@ -101,39 +105,42 @@ async def find_devices(client, project_arn, device_id):
             device_arn = device["arn"]
             device_arn_suffix = device["arn"].split(":")[-1]
 
-            if device_id in [device_name, device_name_os, device_arn, device_arn_suffix]:
-                devices.append((device_name_os, device_arn))
+            for device_id in device_ids:
+                if device_id in [device_name, device_name_os, device_arn, device_arn_suffix]:
+                    matched_device_names.append(device_name_os)
+                    matched_device_arns.append(device_arn)
+                    unmatched_ids.discard(device_id)
 
             for instance in device.get('instances', []):
                 instance_arn = instance['arn']
                 instance_arn_suffix = instance["arn"].split(":")[-1]
                 device_name_os_instance = f'{device["name"]} ({device["os"]}) ({instance_arn_suffix})'
 
-                if device_id in [instance_arn, instance_arn_suffix, device_name_os_instance]:
-                    devices_instances.append((device_name_os_instance, instance_arn))
+                for device_id in device_ids:
+                    if device_id in [instance_arn, instance_arn_suffix, device_name_os_instance]:
+                        matched_instance_names.append(device_name_os_instance)
+                        matched_instance_arns.append(instance_arn)
+                        unmatched_ids.discard(device_id)
 
-    if devices_instances:
-        names = ", ".join(name for name, arn in devices_instances)
-        arns = ", ".join(arn for name, arn in devices_instances)
-        filters = [{
+    if unmatched_ids:
+        raise KeyError(f'Devices not found: {", ".join(unmatched_ids)}')
+    elif matched_device_names and matched_instance_names:
+        raise ValueError(f'You cannot mix devices ({", ".join(matched_device_names)}) and instances ({", ".join(matched_instance_names)})')
+    elif matched_instance_names:
+        logger.info(f'Using instances: {", ".join(matched_instance_names)}')
+        return [{
             "attribute": "INSTANCE_ARN",
             "operator": "IN",
-            "values": [arn for name, arn in devices_instances]
+            "values": matched_instance_arns
         }]
-        logger.info(f'Using device {names}: {arns}')
-        return filters
-    elif devices:
-        names = ", ".join(name for name, arn in devices)
-        arns = ", ".join(arn for name, arn in devices)
-        filters = [{
+    elif matched_device_names:
+        logger.info(f'Using devices: {", ".join(matched_device_names)}')
+        return [{
             "attribute": "ARN",
             "operator": "IN",
-            "values": [arn for name, arn in devices]
+            "values": matched_device_arns
         }]
-        logger.info(f'Using device instances {names}: {arns}')
-        return filters
-    else:
-        raise KeyError(f"Device not found: {device_id}")
+
 
 
 async def upload(client, http_session, project_arn, uploads_to_delete, name, type, data):
@@ -158,15 +165,15 @@ async def upload(client, http_session, project_arn, uploads_to_delete, name, typ
 
 
 
-async def run(project_name, device_id, device_pool, ssh_path):
+async def run(project_name, device_ids, device_pool, ssh_path):
     async with aiobotocore.get_session().create_client('devicefarm') as client, \
                aiohttp.ClientSession() as http_session:
         project_arn = await find_project(client, project_name)
 
-        if device_id is not None:
+        if device_ids:
             device_filter = {
                 "deviceSelectionConfiguration": {
-                    "filters": await find_devices(client, project_arn, device_id),
+                    "filters": await find_devices(client, project_arn, device_ids),
                     "maxDevices": 999
                 }
             }

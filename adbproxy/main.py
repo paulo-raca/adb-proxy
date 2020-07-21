@@ -38,7 +38,7 @@ async def main():
     parser_df.add_argument("--project", dest='project_name', default="Remote Debug", help="Project Name")
     parser_df_group = parser_df.add_mutually_exclusive_group()
     parser_df_group.add_argument("--device-pool", dest='device_pool', default="Default Pool", help="Device Pool")
-    parser_df_group.add_argument("--device", dest='device_id', default=None, help="Device ID, ARN, Name or instance ID")
+    parser_df_group.add_argument("--device", dest='device_ids', action="append", help="Device ID, ARN, Name or instance ID")
     parser_df.set_defaults(func=devicefarm)
 
     argcomplete.autocomplete(parser)
