@@ -34,9 +34,11 @@ async def main():
     parser_listen_reverse = subparsers.add_parser('listen-reverse', parents=[listen_reverser_base_parser], help='Awaits reverse connections from devices')
     parser_listen_reverse.set_defaults(func=listen_reverse)
 
-    parser_df = subparsers.add_parser('device-farm', parents=[listen_reverser_base_parser], help='Awaits connections from DeviceFarm')
+    parser_df = subparsers.add_parser('devicefarm', parents=[listen_reverser_base_parser], help='Awaits connections from DeviceFarm')
     parser_df.add_argument("--project", dest='project_name', default="Remote Debug", help="Project Name")
-    parser_df.add_argument("--device-pool", dest='device_pool', default="Default Pool", help="Device Pool")
+    parser_df_group = parser_df.add_mutually_exclusive_group()
+    parser_df_group.add_argument("--device-pool", dest='device_pool', default="Default Pool", help="Device Pool")
+    parser_df_group.add_argument("--device", dest='device_ids', action="append", help="Device ID, ARN, Name or instance ID")
     parser_df.set_defaults(func=devicefarm)
 
     argcomplete.autocomplete(parser)

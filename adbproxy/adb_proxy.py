@@ -562,12 +562,12 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
         logger.info(f"Disconnected")
 
 
-async def devicefarm(project_name, device_pool, *args, **kwargs):
+async def devicefarm(project_name, device_ids, device_pool, *args, **kwargs):
     # This is the only "security" measure: The client must use a matching random username
     kwargs["listen_address"]["username"] = f"adb-proxy-{random_str(15)}"
 
     async def listen_until(socket_addr, ssh_client):
-        await aws.run(project_name, device_pool, socket_addr)
+        await aws.run(project_name, device_ids, device_pool, socket_addr)
 
     return await listen_reverse(*args, **kwargs, wait_for=listen_until)
 
