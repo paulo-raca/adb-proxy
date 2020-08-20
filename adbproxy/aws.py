@@ -105,22 +105,23 @@ async def find_devices(client, project_arn, device_ids):
             device_arn = device["arn"]
             device_arn_suffix = device["arn"].split(":")[-1]
 
-            for device_id in device_ids:
-                if device_id in [device_name, device_name_os, device_arn, device_arn_suffix]:
-                    matched_device_names.append(device_name_os)
-                    matched_device_arns.append(device_arn)
-                    unmatched_ids.discard(device_id)
-
-            for instance in device.get('instances', []):
-                instance_arn = instance['arn']
-                instance_arn_suffix = instance["arn"].split(":")[-1]
-                device_name_os_instance = f'{device["name"]} ({device["os"]}) ({instance_arn_suffix})'
-
+            if device["fleetType"] == 'PUBLIC':
                 for device_id in device_ids:
-                    if device_id in [instance_arn, instance_arn_suffix, device_name_os_instance]:
-                        matched_instance_names.append(device_name_os_instance)
-                        matched_instance_arns.append(instance_arn)
+                    if device_id in [device_name, device_name_os, device_arn, device_arn_suffix]:
+                        matched_device_names.append(device_name_os)
+                        matched_device_arns.append(device_arn)
                         unmatched_ids.discard(device_id)
+            else:
+                for instance in device.get('instances', []):
+                    instance_arn = instance['arn']
+                    instance_arn_suffix = instance["arn"].split(":")[-1]
+                    device_name_os_instance = f'{device["name"]} ({device["os"]}) ({instance_arn_suffix})'
+
+                    for device_id in device_ids:
+                        if device_id in [instance_arn, instance_arn_suffix, device_name_os_instance]:
+                            matched_instance_names.append(device_name_os_instance)
+                            matched_instance_arns.append(instance_arn)
+                            unmatched_ids.discard(device_id)
 
     if unmatched_ids:
         raise KeyError(f'Devices not found: {", ".join(unmatched_ids)}')
