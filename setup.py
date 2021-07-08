@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='adbproxy',
-    version='1.0.4',
+    version='1.0.5',
     author="Paulo Costa",
     author_email="me@paulo.costa.nom.br",
     description="Creates an ADB bridge between your computer and a device somewhere else",
@@ -26,7 +26,7 @@ setuptools.setup(
     install_requires=[
         "aioboto3>=6.4.1",
         "aiohttp>=3.6.2",
-        "asyncssh>=2.1.0",
+        "asyncssh>=2.7.0",
         "argcomplete>=1.10.3",
         "uri>=2.0.1",
         "miniupnpc>=2.0.2",

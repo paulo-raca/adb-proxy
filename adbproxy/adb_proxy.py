@@ -455,11 +455,11 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                 logger.info(f"Reverse connection lost")
 
     try:
-        server = await asyncssh.listen_reverse(
+        server = (await asyncssh.listen_reverse(
                 tunnel = ssh_client,
                 client_factory = MySSHClient,
                 acceptor = on_connected,
-                **listen_address)
+                **listen_address))._server
         async with server:
             if ssh_client is None:
                 # Listening on a plain TCP socket
