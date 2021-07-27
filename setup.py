@@ -29,7 +29,7 @@ setuptools.setup(
         "asyncssh>=2.7.0",
         "argcomplete>=1.10.3",
         "uri>=2.0.1",
-        "miniupnpc>=2.0.2",
+        "aioupnp>=0.0.18",
         "PyYAML>=5.1.2",
     ],
     classifiers=[
