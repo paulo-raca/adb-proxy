@@ -52,13 +52,15 @@ class PortMapping:
 
 
 
-#import time
-#import asyncio
-#logging.basicConfig()
+# Quick test: python3 -m adbproxy.upnp
+if __name__ == '__main__':
+    import time
+    import asyncio
+    logging.basicConfig()
 
-#async def main():
-    #async with (await UPnP.get()).map_port( ("192.168.56.10", 1234) ) as portmap:
-        #print(portmap)
-        #time.sleep(1)
+    async def main():
+        async with (await UPnP.get()).map_port( ("192.168.56.10", 1234) ) as portmap:
+            print(portmap)
+            time.sleep(1)
 
-#asyncio.run(main())
+    asyncio.run(main())
