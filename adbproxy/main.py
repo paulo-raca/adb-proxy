@@ -1,5 +1,4 @@
 from .adb_proxy import *
-from .util import *
 
 async def main():
     parser = argparse.ArgumentParser(description="Creates ADB Proxy connections")
@@ -49,4 +48,4 @@ async def main():
 
 
 def main_sync():
-    return asyncio_run(main(), debug=True)
+    return asyncio.run(main(), debug=True)
