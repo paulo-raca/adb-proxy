@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='adbproxy',
-    version='1.0.5',
+    version='1.0.6',
     author="Paulo Costa",
     author_email="me@paulo.costa.nom.br",
     description="Creates an ADB bridge between your computer and a device somewhere else",
@@ -36,7 +36,7 @@ setuptools.setup(
         "Topic :: Internet :: Proxy Servers",
         "Intended Audience :: Developers",
         "Environment :: Console",
-        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
         "Operating System :: Android",
     ],
 )
