@@ -421,6 +421,7 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
         ngrok_cmd = None
 
     listen_address.setdefault("username", "adb-proxy")
+    listen_address.setdefault("password", None)
     listen_address.setdefault("host", "localhost")
     listen_address.setdefault("port", 0)
     listen_address.setdefault("known_hosts", None)
@@ -527,6 +528,7 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
     server_address.setdefault("username", "adb-proxy")
     server_address.setdefault("host", "localhost")
     server_address.setdefault("port", 22)
+    server_address.setdefault("password", None)
 
     class MySSHServer(asyncssh.SSHServer):
         def connection_made(self, conn):
@@ -534,10 +536,24 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
 
         def begin_auth(self, username):
             if username != server_address["username"]:
-                logger.info(f"Authenticating with {username}: Denied")
+                logger.warning(f"Authenticating with {username}: Denied")
+                return True
+            elif server_address["password"] is not None:
+                logger.info(f"Authenticating with {username}: Requires Password")
                 return True
             else:
                 logger.info(f"Authenticating with {username}: Accepted")
+                return
+
+        def password_auth_supported(self) -> bool:
+            return server_address["password"] is not None
+
+        def validate_password(self, username: str, password: str) -> bool:
+            if server_address["username"] == username and server_address["password"] == password:
+                logger.info(f"Authenticating with {username}/***: Accepted")
+                return True
+            else:
+                logger.warning(f"Authenticating with {username}/***: Denied")
                 return False
 
         def server_requested(self, listen_host, listen_port):

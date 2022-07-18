@@ -22,11 +22,12 @@ def ssh_config(config):
     }
     if parsed.username is not None:
         ret["username"] = parsed.username
+    if parsed.password is not None:
+        ret["password"] = parsed.password
     if parsed.hostname is not None:
         ret["host"] = parsed.hostname
     if parsed.port is not None:
         ret["port"] = parsed.port
-
     return ret
 
 def hostport(sockaddr):
