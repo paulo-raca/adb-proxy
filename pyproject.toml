@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "adbproxy"
+version = "1.1.0"
+description = "Proxy to access android devices attached to a remote machine via ADB"
+readme = "README.md"
+authors = ["Paulo Costa"]
+packages = [
+    { include = "adbproxy" },
+]
+
+[tool.poetry.scripts]
+adbproxy = 'adbproxy:main_sync'
+
+[tool.poetry.dependencies]
+python = "^3.9"
+argcomplete = "^2.0.0"
+asyncssh = "^2.11.0"
+uri = {git = "https://github.com/marrow/uri.git", rev = "develop"}
+aioupnp = "^0.0.18"
+aiobotocore = "^2.3.4"
+
+
+
+[tool.poetry.dev-dependencies]
+mypy = "^0.961"
+pre-commit = "^2.19.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 149
+
+[tool.isort]
+src_paths = ["adbproxy", "tests"]
+profile = "black"
+indent = 4
+combine_star = true
+combine_as_imports = true
+lines_after_imports = 2
+known_pytest = ["pytest"]
+known_first_party = ["adbproxy"]
+sections = ["FUTURE", "STDLIB", "PYTEST", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]

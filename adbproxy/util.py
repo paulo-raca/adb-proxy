@@ -1,7 +1,9 @@
 import asyncio
-import uri
-import string
 import random
+import string
+
+import uri
+
 
 async def check_call(program, *args, **kwargs):
     proc = await asyncio.create_subprocess_exec(program, *args, **kwargs)
@@ -10,13 +12,13 @@ async def check_call(program, *args, **kwargs):
         raise Exception(f"{program} exited with code {exitcode}")
 
 
-def sockaddr(addr):
-    parsed = uri.URI('//' + addr + "/")
+def sock_addr(addr):
+    parsed = uri.URI("//" + addr + "/")
     return parsed.hostname, parsed.port
 
 
-def ssh_config(config):
-    parsed = uri.URI('//' + config + "/")
+def ssh_addr(config):
+    parsed = uri.URI("//" + config + "/")
     ret = {
         "known_hosts": None,
     }
@@ -30,16 +32,19 @@ def ssh_config(config):
         ret["port"] = parsed.port
     return ret
 
+
 def hostport(sockaddr):
     return ssh_uri({"host": sockaddr[0], "port": sockaddr[1]})
+
 
 def ssh_uri(sockaddr):
     return uri.URI(
         username=sockaddr.get("username"),
         password="***" if sockaddr.get("password") is not None else None,
         hostname=sockaddr.get("host"),
-        port=sockaddr.get("port")
+        port=sockaddr.get("port"),
     ).uri[2:-1]
 
+
 def random_str(size=6, chars=string.ascii_uppercase + string.ascii_lowercase + string.digits):
-    return ''.join(random.choice(chars) for x in range(size))
+    return "".join(random.choice(chars) for x in range(size))

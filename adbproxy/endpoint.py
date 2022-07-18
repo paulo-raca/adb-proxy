@@ -1,15 +1,17 @@
 import asyncio
-from abc import ABC, abstractmethod
 import socket
+from abc import ABC, abstractmethod
+
 import asyncssh
+
 
 class Endpoint(ABC):
     @staticmethod
     async def of(adb_sockaddr, ssh_client=None):
         if ssh_client:
             try:
-                hostname = (await ssh_client.run("hostname", stdin=asyncssh.DEVNULL, stderr=asyncssh.DEVNULL)).stdout.strip() or hostname
-            except Exception as e:
+                hostname = await ssh_client.run("hostname", stdin=asyncssh.DEVNULL, stderr=asyncssh.DEVNULL).stdout.strip() or None
+            except Exception:
                 hostname = None
 
             # FIXME: Can we figure out the IP that would be used to connect to `adb_sockaddr` ?
@@ -18,12 +20,11 @@ class Endpoint(ABC):
             hostname = hostname or ssh_client._host or addr
             return SshEndpoint(hostname, ssh_client, addr, adb_sockaddr)
         else:
-            reader, writer = await asyncio.open_connection(adb_sockaddr[0], adb_sockaddr[1])
-            local_addr = writer.transport.get_extra_info('sockname')[0]
+            _, writer = await asyncio.open_connection(adb_sockaddr[0], adb_sockaddr[1])
+            local_addr = writer.transport.get_extra_info("sockname")[0]
             writer.close()
 
             return LocalEndpoint(socket.gethostname(), local_addr, adb_sockaddr)
-
 
     def __init__(self, local_hostname, local_addr, adb_sockaddr):
         self.local_hostname = local_hostname
@@ -46,7 +47,6 @@ class Endpoint(ABC):
         pass
 
 
-
 class SshEndpoint(Endpoint):
     def __init__(self, local_hostname, ssh_client, local_addr, adb_sockaddr):
         Endpoint.__init__(self, local_hostname, local_addr, adb_sockaddr)
@@ -61,9 +61,15 @@ class SshEndpoint(Endpoint):
         return server, (self.local_addr, server.get_port())
 
     async def shell(self, command, pty=True):
-        proc = await self.ssh_client.create_process(command, stdin=asyncssh.PIPE, stdout=asyncssh.PIPE, stderr=asyncssh.STDOUT, encoding=None, term_type='xterm-color' if pty else None)
+        proc = await self.ssh_client.create_process(
+            command,
+            stdin=asyncssh.PIPE,
+            stdout=asyncssh.PIPE,
+            stderr=asyncssh.STDOUT,
+            encoding=None,
+            term_type="xterm-color" if pty else None,
+        )
         return proc.stdout, proc.stdin
-
 
 
 class LocalEndpoint(Endpoint):
@@ -79,5 +85,11 @@ class LocalEndpoint(Endpoint):
 
     async def shell(self, command, pty=True):
         # TODO: Support PTY
-        proc = await asyncio.create_subprocess_shell(command, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, encoding=None)
+        proc = await asyncio.create_subprocess_shell(
+            command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            encoding=None,
+        )
         return proc.stdout, proc.stdin
