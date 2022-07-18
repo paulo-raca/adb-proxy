@@ -36,11 +36,14 @@ async def main_async():
         action="store_false",
         help="Disables reverse connection proxy (device->host)",
     )
-    deviceinfo_parser.add_argument(
-        "--share",
-        dest="share",
-        action="store_true",
-        help="Swaps the roles of local and remote endpoints (Shares a local device with a remote computer)",
+
+    connect_cmd_parser = argparse.ArgumentParser(add_help=False)
+    connect_cmd_parser.add_argument(
+        "--scrcpy",
+        dest="connect_cmd",
+        action="store_const",
+        const=["scrcpy", "-b384k", "-m960"],
+        help="Open an iteractive scrcpy session to the attached device",
     )
 
     hostinfo_parser = argparse.ArgumentParser(add_help=False)
@@ -52,7 +55,7 @@ async def main_async():
         help="Socket address of ADB server away from the device",
     )
 
-    listen_reverse_base_parser = argparse.ArgumentParser(add_help=False, parents=[hostinfo_parser, ssh_jump_parser])
+    listen_reverse_base_parser = argparse.ArgumentParser(add_help=False, parents=[hostinfo_parser, ssh_jump_parser, connect_cmd_parser])
     listen_reverse_base_parser.add_argument(
         "listen_address",
         type=ssh_addr,
@@ -76,7 +79,7 @@ async def main_async():
 
     parser_connect_client = subparsers.add_parser(
         "connect",
-        parents=[deviceinfo_parser, hostinfo_parser, ssh_jump_parser],
+        parents=[deviceinfo_parser, hostinfo_parser, ssh_jump_parser, connect_cmd_parser],
         help="Makes a direct connection to the device ADB",
     )
     parser_connect_client.set_defaults(func=connect)

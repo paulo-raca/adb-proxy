@@ -18,6 +18,7 @@ import asyncio
 import binascii
 import json
 import logging
+import os
 import re
 import socket
 import struct
@@ -28,7 +29,7 @@ import asyncssh
 from .adb_channel import device_path, list_adb_devices, open_stream, read_stream
 from .endpoint import Endpoint
 from .upnp import UPnP
-from .util import hostport, ssh_uri
+from .util import check_call, hostport, ssh_uri
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -351,7 +352,7 @@ class AdbProxy:
             self.writer.close()
 
     @staticmethod
-    async def attach_raw(local_endpoint, remote_endpoint, device_id, reverse_connection_supported):
+    async def attach_raw(local_endpoint, remote_endpoint, device_id, reverse_connection_supported, wait_for=None):
         devices = await list_adb_devices(remote_endpoint)
         if device_id is None:
             if len(devices) == 1:
@@ -370,9 +371,7 @@ class AdbProxy:
 
         async def on_connected(r, w):
             logger.info(f"Connected to ADB server {hostport(local_endpoint.adb_sockaddr)} @ {local_endpoint.local_hostname}")
-            proxy_task[0] = asyncio.create_task(
-                AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_name, reverse_connection_supported).go()
-            )
+            proxy_task[0] = AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_name, reverse_connection_supported).go()
 
         server, server_addr = await local_endpoint.listen(on_connected)
         addr = hostport(server_addr)
@@ -387,14 +386,16 @@ class AdbProxy:
                     await read_stream(remote_endpoint, device_path(device_id), "shell:cat -")
                     raise EOFError(f"Disconnected from the device {device_id} @ {remote_endpoint.local_hostname} ({device_name})")
 
-                connection_alive = asyncio.create_task(check_device_alive())
+                wait_tasks = {asyncio.create_task(proxy_task[0]), asyncio.create_task(check_device_alive())}
+                if wait_for is not None:
+                    wait_tasks.add(asyncio.create_task(wait_for(addr)))
+
                 try:
-                    for x in asyncio.as_completed([proxy_task[0], connection_alive]):
-                        await x
+                    await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
                 finally:
-                    proxy_task[0].cancel()
-                    connection_alive.cancel()
-                    await asyncio.gather(proxy_task[0], connection_alive)
+                    for task in wait_tasks:
+                        task.cancel()
+                    await asyncio.gather(*wait_tasks, return_exceptions=True)
             else:
                 raise Exception("Didn't receive a connection from ADB")
 
@@ -409,7 +410,7 @@ class AdbProxy:
 async def connect(
     device_id,
     adb_reverse_supported=True,
-    share=False,
+    connect_cmd=None,
     host_adb_addr=("localhost", 5037),
     device_adb_addr=("localhost", 5037),
     ssh_client=None,
@@ -417,9 +418,18 @@ async def connect(
     logger.info("Connecting...")
     local_endpoint = await Endpoint.of(host_adb_addr)
     remote_endpoint = await Endpoint.of(device_adb_addr, ssh_client)
-    if share:
-        local_endpoint, remote_endpoint = remote_endpoint, local_endpoint
-    return await AdbProxy.attach_raw(local_endpoint, remote_endpoint, device_id, adb_reverse_supported)
+
+    if connect_cmd:
+
+        async def wait_for(serial):
+            env = dict(os.environ)
+            env["ANDROID_SERIAL"] = serial
+            await check_call(*connect_cmd, env=env)
+
+    else:
+        wait_for = None
+
+    return await AdbProxy.attach_raw(local_endpoint, remote_endpoint, device_id, adb_reverse_supported, wait_for=wait_for)
 
 
 async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=False, **kwargs):

@@ -238,7 +238,7 @@ async def run(project_name, device_ids, device_pool, ssh_path):
             )
 
             run_config = {
-                "name": "ADB Bridge",
+                "name": "ADB Proxy",
                 "projectArn": project_arn,
                 "appArn": main_apk_arn,
                 "test": {"type": "INSTRUMENTATION", "testPackageArn": test_apk_arn, "testSpecArn": testspec_arn},
