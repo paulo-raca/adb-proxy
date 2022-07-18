@@ -28,7 +28,7 @@ setuptools.setup(
         "aiohttp>=3.6.2",
         "asyncssh>=2.7.0",
         "argcomplete>=1.10.3",
-        "uri>=2.0.1",
+        "uri @ git+https://github.com/marrow/uri.git",
         "aioupnp>=0.0.18",
         "PyYAML>=5.1.2",
     ],
