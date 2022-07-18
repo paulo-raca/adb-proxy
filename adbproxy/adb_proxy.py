@@ -25,6 +25,7 @@ import re
 import signal
 import sys
 import traceback
+import socket
 
 from .adb_channel import *
 from .util import *
@@ -462,26 +463,28 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                 acceptor = on_connected,
                 **listen_address))._server
         async with server:
+            socket_addr = dict(listen_address)
             if ssh_client is None:
                 # Listening on a plain TCP socket
-                socket_addr = [listen_address['username'], server.sockets[0].getsockname()[0], server.sockets[0].getsockname()[1]]
+                socket_addr["host"] = server.sockets[0].getsockname()[0]
+                socket_addr["port"] = server.sockets[0].getsockname()[1]
 
                 test_addrs = {
-                    "0.0.0.0": ("ipv4.lookup.test-ipv6.com", 443),
-                    "::": ("ipv6.lookup.test-ipv6.com", 443),
+                    "0.0.0.0": socket.AF_INET,
+                    "::": socket.AF_INET6,
                 }
-                test_addr = test_addrs.get(socket_addr[1], None)
-                if test_addr is not None:
+                test_family = test_addrs.get(socket_addr["host"], None)
+                if test_family is not None:
                     try:
-                        reader, writer = await asyncio.open_connection(test_addr[0], test_addr[1])
-                        socket_addr[1] = writer.transport.get_extra_info('sockname')[0]
+                        reader, writer = await asyncio.open_connection("example.com", 80, family=test_family)
+                        socket_addr["host"] = writer.transport.get_extra_info('sockname')[0]
                         writer.close()
                     except:
                         logger.warning(f"Cannot get server's real IP")
 
             else:
                 # Listening through a SSH tunnel
-                socket_addr = [listen_address['username'], listen_address["host"], server.get_port()]
+                socket_addr["port"] = server.get_port()
 
                 if ngrok_cmd:
                     async for row in ngrok_cmd.stdout:
@@ -489,19 +492,19 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                         logger.info(f"ngrok: {row}")
                         match = re.match('Forwarding  tcp://(.*):(.*)', row)
                         if (match):
-                            socket_addr[1] = match.group(1)
-                            socket_addr[2] = int(match.group(2))
+                            socket_addr["host"] = match.group(1)
+                            socket_addr["port"] = int(match.group(2))
                             break
 
-                elif socket_addr[1] in ["0.0.0.0", "::"]:
+                elif socket_addr["host"] in ["0.0.0.0", "::"]:
                     try:
-                        socket_addr[1] = ssh_client._peer_addr
+                        socket_addr["host"] = ssh_client._peer_addr
                     except:
                         logger.warning(f"Cannot get server's real IP")
 
 
             async def wait_until_complete():
-                logger.info(f"Listening for reverse connections: {userhostport(socket_addr)}")
+                logger.info(f"Listening for reverse connections: {ssh_uri(socket_addr)}")
                 if wait_for:
                     await wait_for(socket_addr, ssh_client=ssh_client)
                 else:
@@ -510,8 +513,9 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                     await asyncio.Semaphore(0).acquire()
 
             if upnp:
-                async with upnp.map_port(socket_addr[1:], "ADB Proxy") as port_map:
-                    socket_addr = (socket_addr[0], *port_map.ext_addr)
+                async with upnp.map_port((socket_addr["host"], socket_addr["port"]), "ADB Proxy") as port_map:
+                    socket_addr["host"] = port_map.ext_addr[0]
+                    socket_addr["port"] = port_map.ext_addr[1]
                     await wait_until_complete()
             else:
                 await wait_until_complete()
@@ -579,8 +583,8 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
 
 
 async def devicefarm(project_name, device_ids, device_pool, *args, **kwargs):
-    # This is the only "security" measure: The client must use a matching random username
-    kwargs["listen_address"]["username"] = f"adb-proxy-{random_str(15)}"
+    # For security, uses a random password to secure the connection
+    kwargs["listen_address"].setdefault("password", random_str(16))
 
     async def listen_until(socket_addr, ssh_client):
         await aws.run(project_name, device_ids, device_pool, socket_addr)
@@ -591,7 +595,7 @@ async def devicefarm(project_name, device_ids, device_pool, *args, **kwargs):
 async def use_tunnels(func, ssh_tunnels=[], ssh_client=None, *args, **kwargs):
     if ssh_tunnels:
         async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
-            logger.info(f"Jumping through SSH proxy: {ssh_tunnels[0]}")
+            logger.info(f"Jumping through SSH proxy: {ssh_uri(ssh_tunnels[0])}")
             return await use_tunnels(ssh_tunnels=ssh_tunnels[1:], ssh_client=ssh_client, func=func, *args, **kwargs)
 
     return await func(ssh_client=ssh_client, **kwargs)

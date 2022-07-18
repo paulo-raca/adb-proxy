@@ -31,10 +31,15 @@ def ssh_config(config):
     return ret
 
 def hostport(sockaddr):
-    return uri.URI(hostname=sockaddr[0], port=sockaddr[1]).uri[2:-1]
+    return ssh_uri({"host": sockaddr[0], "port": sockaddr[1]})
 
-def userhostport(sockaddr):
-    return uri.URI(username=sockaddr[0], hostname=sockaddr[1], port=sockaddr[2]).uri[2:-1]
+def ssh_uri(sockaddr):
+    return uri.URI(
+        username=sockaddr.get("username"),
+        password="***" if sockaddr.get("password") is not None else None,
+        hostname=sockaddr.get("host"),
+        port=sockaddr.get("port")
+    ).uri[2:-1]
 
 def random_str(size=6, chars=string.ascii_uppercase + string.ascii_lowercase + string.digits):
     return ''.join(random.choice(chars) for x in range(size))
