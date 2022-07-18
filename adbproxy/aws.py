@@ -4,11 +4,14 @@ import asyncio
 import logging
 import re
 
-import aiobotocore
+import aiobotocore.session
 import aiohttp
 import yaml
 from pkg_resources import resource_string
 
+from adbproxy.util import random_str
+
+from .adb_proxy import listen_reverse
 from .util import ssh_uri
 
 
@@ -166,7 +169,7 @@ async def upload(client, http_session, project_arn, uploads_to_delete, name, typ
 
 
 async def run(project_name, device_ids, device_pool, ssh_path):
-    async with aiobotocore.get_session().create_client("devicefarm") as client, aiohttp.ClientSession() as http_session:
+    async with aiobotocore.session.get_session().create_client("devicefarm") as client, aiohttp.ClientSession() as http_session:
         project_arn = await find_project(client, project_name)
 
         if device_ids:
@@ -192,13 +195,15 @@ async def run(project_name, device_ids, device_pool, ssh_path):
                             # "tar -xf python3.6-prebuilt.tar.gz",  # Executable at "$PWD/python3.6-prebuilt/bin/python3"
                             "virtualenv3 $(pwd)/env3",
                             ". env3/bin/activate",
-                            "lsb_release -a",
-                            "uname -a",
                             "python -V",
                             "python -m pip install git+https://github.com/paulo-raca/adb-proxy.git",
                         ],
                     },
-                    "test": {"commands": [f'python -m adbproxy connect-reverse --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path)}"']},
+                    "test": {
+                        "commands": [
+                            f'python -m adbproxy connect-reverse --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path, hide_pwd=False)}"'
+                        ]
+                    },
                 },
             }
 
@@ -237,10 +242,6 @@ async def run(project_name, device_ids, device_pool, ssh_path):
                 "projectArn": project_arn,
                 "appArn": main_apk_arn,
                 "test": {"type": "INSTRUMENTATION", "testPackageArn": test_apk_arn, "testSpecArn": testspec_arn},
-                "executionConfiguration": {
-                    "jobTimeoutMinutes": 600,
-                    "videoCapture": True,
-                },
             }
             run_config.update(device_filter)
 
@@ -268,3 +269,13 @@ async def run(project_name, device_ids, device_pool, ssh_path):
             for upload_name, upload_type, upload_arn in uploads_to_delete:
                 await client.delete_upload(arn=upload_arn)
                 logger.info(f"Deleted uploaded: {upload_name} ({upload_type})")
+
+
+async def devicefarm(project_name, device_ids, device_pool, *args, **kwargs):
+    # For security, uses a random password to secure the connection
+    kwargs["listen_address"].setdefault("password", random_str(16))
+
+    async def listen_until(socket_addr, ssh_client):
+        await run(project_name, device_ids, device_pool, socket_addr)
+
+    return await listen_reverse(*args, **kwargs, wait_for=listen_until)

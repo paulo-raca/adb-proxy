@@ -9,15 +9,20 @@ packages = [
 ]
 
 [tool.poetry.scripts]
-adbproxy = 'adbproxy:main_sync'
+adbproxy = 'adbproxy:main'
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.7"
 argcomplete = "^2.0.0"
 asyncssh = "^2.11.0"
-uri = {git = "https://github.com/marrow/uri.git", rev = "develop"}
+
 aioupnp = "^0.0.18"
 aiobotocore = "^2.3.4"
+uri = [
+  {version = "<=2.0.1", python = "<=3.7"},
+  {git = "https://github.com/marrow/uri.git", rev = "develop", python = "^3.8"}
+]
+PyYAML = "^6.0"
 
 
 

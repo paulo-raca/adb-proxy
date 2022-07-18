@@ -37,10 +37,17 @@ def hostport(sockaddr):
     return ssh_uri({"host": sockaddr[0], "port": sockaddr[1]})
 
 
-def ssh_uri(sockaddr):
+def ssh_uri(sockaddr, hide_pwd: bool = True):
+    if sockaddr.get("password") is None:
+        password = None
+    elif hide_pwd:
+        password = "***"
+    else:
+        password = sockaddr.get("password")
+
     return uri.URI(
         username=sockaddr.get("username"),
-        password="***" if sockaddr.get("password") is not None else None,
+        password=password,
         hostname=sockaddr.get("host"),
         port=sockaddr.get("port"),
     ).uri[2:-1]

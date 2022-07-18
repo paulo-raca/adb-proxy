@@ -25,11 +25,10 @@ import traceback
 
 import asyncssh
 
-from . import aws
 from .adb_channel import device_path, list_adb_devices, open_stream, read_stream
 from .endpoint import Endpoint
 from .upnp import UPnP
-from .util import hostport, random_str, ssh_uri
+from .util import hostport, ssh_uri
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -595,16 +594,6 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
         logger.info("Connected")
         await ssh_conn.wait_closed()
         logger.info("Disconnected")
-
-
-async def devicefarm(project_name, device_ids, device_pool, *args, **kwargs):
-    # For security, uses a random password to secure the connection
-    kwargs["listen_address"].setdefault("password", random_str(16))
-
-    async def listen_until(socket_addr, ssh_client):
-        await aws.run(project_name, device_ids, device_pool, socket_addr)
-
-    return await listen_reverse(*args, **kwargs, wait_for=listen_until)
 
 
 async def use_tunnels(func, ssh_tunnels=[], ssh_client=None, *args, **kwargs):

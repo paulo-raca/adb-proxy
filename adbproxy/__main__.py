@@ -1,5 +1,5 @@
-from .main import main_sync
+from .main import main
 
 
 if __name__ == "__main__":
-    main_sync()
+    main()
