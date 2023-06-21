@@ -28,7 +28,6 @@ import asyncssh
 
 from .adb_channel import device_path, list_adb_devices, open_stream, read_stream
 from .endpoint import Endpoint
-from .upnp import UPnP
 from .util import check_call, hostport, ssh_uri
 
 
@@ -436,9 +435,13 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
     if upnp:
         if ssh_client:
             raise Exception("Use either UPnP or SSH tunnels")
-        upnp = await UPnP.get()
-        listen_address["host"] = upnp.lan_ip
+        from .upnp import UPnP
+
+        upnp_client = await UPnP.get()
+        listen_address["host"] = upnp_client.lan_ip
         listen_address["port"] = 0
+    else:
+        upnp_client = None
 
     if ssh_client and ssh_client._host.endswith(".ngrok.com"):
         logger.info("Setting up ngrok for TCP")
@@ -535,8 +538,8 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                     logger.info("Cancel with Ctrl-C")
                     await asyncio.Semaphore(0).acquire()
 
-            if upnp:
-                async with upnp.map_port((socket_addr["host"], socket_addr["port"]), "ADB Proxy") as port_map:
+            if upnp_client:
+                async with upnp_client.map_port((socket_addr["host"], socket_addr["port"]), "ADB Proxy") as port_map:
                     socket_addr["host"] = port_map.ext_addr[0]
                     socket_addr["port"] = port_map.ext_addr[1]
                     await wait_until_complete()

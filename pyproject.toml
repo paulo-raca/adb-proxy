@@ -12,19 +12,28 @@ packages = [
 adbproxy = 'adbproxy:main'
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.7"
 argcomplete = "^3.1.1"
 asyncssh = "^2.13.1"
-
+PyYAML = "^6.0"
+uri = [
+    {version = "^2.0.1", python = "< 3.8"},
+    {git = "https://github.com/marrow/uri.git", rev = "develop", python = ">= 3.8"}
+]
+cryptography = [
+    {version="< 3.5", python = "< 3.8"},
+    {version="^41.0.1", python = ">= 3.8"}
+]
 aioupnp = {git = "https://github.com/paulo-raca/aioupnp.git", rev = "python3.10", optional=true}
 aiobotocore = {version="^2.5.0", optional=true}
-uri = {git = "https://github.com/marrow/uri.git", rev = "develop"}
-PyYAML = "^6.0"
 
+[tool.poetry.extras]
+devicefarm = ["aiobotocore"]
+upnp = ["aioupnp"]
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.4.0"
-pre-commit = "^3.3.3"
+pre-commit = {version = "^3.3.3", python = "^3.8"}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

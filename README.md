@@ -20,6 +20,12 @@ To address this scenario, ADB-Proxy connects to 2 ADB servers and intermediates 
 
 When ADB-Proxy is running, the device appears to be attached to both computers
 
+## Installation
+
+The easiest way to install is using PIP, from the git sources:
+
+    pip install git+https://github.com/paulo-raca/adb-proxy.git
+
 ## Usage
 
 ### Direct connection
@@ -66,6 +72,8 @@ user@othercomputer$ adbproxy connect-reverse -s device_serial gatewaycomputer:po
 
 #### UPnP Gateways
 
+> :info: This section requires the installation of the `upnp` extras: `pip install git+https://github.com/paulo-raca/adb-proxy.git[upnp]`
+
 If you are behind a NAT and your router has UPnP enabled, `--upnp` can be used to automatically setup port forwarding on your gateway from public internet
 
 ```bash
@@ -86,6 +94,9 @@ user@othercomputer$ adbproxy connect-reverse ngrok_host:ngrok_port  # listen-rev
 
 
 ### DeviceFarm
+
+> :info: This section requires the installation of the `devicefarm` extras: `pip install git+https://github.com/paulo-raca/adb-proxy.git[devicefarm]`
+
 
 [DeviceFarm](https://aws.amazon.com/pt/device-farm/) is an AWS service for automatic testing of Android and iOS apps.
 

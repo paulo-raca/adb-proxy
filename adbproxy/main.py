@@ -4,7 +4,6 @@ import asyncio
 import argcomplete
 
 from .adb_proxy import connect, connect_reverse, listen_reverse, use_tunnels
-from .aws import devicefarm
 from .util import sock_addr, ssh_addr
 
 
@@ -64,15 +63,20 @@ async def main_async():
         help="Server address where the reverse SSH server will be bound",
     )
     listen_reverse_base_parser.add_argument(
-        "--upnp", action="store_true", help="Uses UPNP to setup the Internet Gateway to receive incoming connections"
-    )
-    listen_reverse_base_parser.add_argument(
         "--ngrok",
         dest="ssh_tunnels",
         action="append_const",
         const={"host": "tunnel.us.ngrok.com", "port": 22, "known_hosts": None, "password": ""},
         help="Uses Ngrok as a Gateway",
     )
+    try:
+        from . import upnp  # noqa: F401
+
+        listen_reverse_base_parser.add_argument(
+            "--upnp", action="store_true", help="Uses UPNP to setup the Internet Gateway to receive incoming connections"
+        )
+    except ModuleNotFoundError:
+        pass
 
     subparsers = parser.add_subparsers(help="commands", dest="cmd")
     subparsers.required = True
@@ -103,12 +107,17 @@ async def main_async():
     )
     parser_listen_reverse.set_defaults(func=listen_reverse)
 
-    parser_devicefarm = subparsers.add_parser("devicefarm", parents=[listen_reverse_base_parser], help="Awaits connections from DeviceFarm")
-    parser_devicefarm.add_argument("--project", dest="project_name", default="adbproxy", help="Project Name")
-    parser_devicefarm_group = parser_devicefarm.add_mutually_exclusive_group()
-    parser_devicefarm_group.add_argument("--device-pool", dest="device_pool", default="Default Pool", help="Device Pool")
-    parser_devicefarm_group.add_argument("--device", dest="device_ids", action="append", help="Device ID, ARN, Name or instance ID")
-    parser_devicefarm.set_defaults(func=devicefarm)
+    try:
+        from .aws import devicefarm
+
+        parser_devicefarm = subparsers.add_parser("devicefarm", parents=[listen_reverse_base_parser], help="Awaits connections from DeviceFarm")
+        parser_devicefarm.add_argument("--project", dest="project_name", default="adbproxy", help="Project Name")
+        parser_devicefarm_group = parser_devicefarm.add_mutually_exclusive_group()
+        parser_devicefarm_group.add_argument("--device-pool", dest="device_pool", default="Default Pool", help="Device Pool")
+        parser_devicefarm_group.add_argument("--device", dest="device_ids", action="append", help="Device ID, ARN, Name or instance ID")
+        parser_devicefarm.set_defaults(func=devicefarm)
+    except ModuleNotFoundError:
+        pass
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args().__dict__
