@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "adbproxy"
-version = "1.1.0"
+version = "1.1.1"
 description = "Proxy to access android devices attached to a remote machine via ADB"
 readme = "README.md"
 authors = ["Paulo Costa"]
@@ -12,23 +12,19 @@ packages = [
 adbproxy = 'adbproxy:main'
 
 [tool.poetry.dependencies]
-python = "^3.7"
-argcomplete = "^2.0.0"
-asyncssh = "^2.11.0"
+python = "^3.8"
+argcomplete = "^3.1.1"
+asyncssh = "^2.13.1"
 
-aioupnp = "^0.0.18"
-aiobotocore = "^2.3.4"
-uri = [
-  {version = "<=2.0.1", python = "<=3.7"},
-  {git = "https://github.com/marrow/uri.git", rev = "develop", python = "^3.8"}
-]
+aioupnp = {git = "https://github.com/paulo-raca/aioupnp.git", rev = "python3.10", optional=true}
+aiobotocore = {version="^2.5.0", optional=true}
+uri = {git = "https://github.com/marrow/uri.git", rev = "develop"}
 PyYAML = "^6.0"
 
 
-
-[tool.poetry.dev-dependencies]
-mypy = "^0.961"
-pre-commit = "^2.19.0"
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.4.0"
+pre-commit = "^3.3.3"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
