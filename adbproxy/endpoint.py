@@ -10,7 +10,7 @@ class Endpoint(ABC):
     async def of(adb_sockaddr, ssh_client=None):
         if ssh_client:
             try:
-                hostname = await ssh_client.run("hostname", stdin=asyncssh.DEVNULL, stderr=asyncssh.DEVNULL).stdout.strip() or None
+                hostname = (await ssh_client.run("hostname", stdin=asyncssh.DEVNULL, stderr=asyncssh.DEVNULL)).stdout.strip() or None
             except Exception:
                 hostname = None
 
