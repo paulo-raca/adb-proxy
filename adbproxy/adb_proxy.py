@@ -400,7 +400,7 @@ class AdbProxy:
 
         finally:
             try:
-                # Execute "adb connect <host>"
+                # Execute "adb disconnect <host>"
                 await read_stream(local_endpoint, f"host:disconnect:{addr}")
             except Exception:
                 pass

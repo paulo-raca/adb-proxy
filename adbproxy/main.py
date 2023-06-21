@@ -7,7 +7,7 @@ from .adb_proxy import connect, connect_reverse, listen_reverse, use_tunnels
 from .util import sock_addr, ssh_addr
 
 
-async def main_async():
+def main():
     parser = argparse.ArgumentParser(description="Creates ADB Proxy connections")
 
     ssh_jump_parser = argparse.ArgumentParser(add_help=False)
@@ -123,8 +123,4 @@ async def main_async():
     args = parser.parse_args().__dict__
     del args["cmd"]
 
-    await use_tunnels(**args)
-
-
-def main():
-    return asyncio.run(main_async(), debug=True)
+    return asyncio.run(use_tunnels(**args), debug=True)
