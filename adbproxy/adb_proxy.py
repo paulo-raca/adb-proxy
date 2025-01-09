@@ -370,22 +370,23 @@ class AdbProxy:
 
         async def on_connected(r, w):
             logger.info(f"Connected to ADB server {hostport(local_endpoint.adb_sockaddr)} @ {local_endpoint.local_hostname}")
-            proxy_task[0] = AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_name, reverse_connection_supported).go()
+            proxy_task[0] = asyncio.create_task(AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_name, reverse_connection_supported).go())
 
         server, server_addr = await local_endpoint.listen(on_connected)
-        addr = hostport(server_addr)
-        async with server:
+        try:
+            addr = hostport(server_addr)
             # Execute "adb connect <host>"
             await read_stream(local_endpoint, f"host:connect:{addr}")
+        finally:
+            server.close()
 
         try:
             if proxy_task[0]:
-
                 async def check_device_alive():
                     await read_stream(remote_endpoint, device_path(device_id), "shell:cat -")
                     raise EOFError(f"Disconnected from the device {device_id} @ {remote_endpoint.local_hostname} ({device_name})")
 
-                wait_tasks = {asyncio.create_task(proxy_task[0]), asyncio.create_task(check_device_alive())}
+                wait_tasks = {proxy_task[0], asyncio.create_task(check_device_alive())}
                 if wait_for is not None:
                     wait_tasks.add(asyncio.create_task(wait_for(addr)))
 

@@ -18,7 +18,7 @@ asyncssh = "^2.13.1"
 PyYAML = "^6.0"
 uri = [
     {version = "^2.0.1", python = "< 3.8"},
-    {git = "https://github.com/marrow/uri.git", rev = "develop", python = ">= 3.8"}
+    {git = "https://github.com/marrow/uri.git", rev = "53f87ef2a5c8fc972c602c54d51dc431a76795fe", python = ">= 3.8"}
 ]
 cryptography = [
     {version="< 3.5", python = "< 3.8"},
