@@ -2,7 +2,7 @@ import asyncio
 import random
 import string
 
-import uri
+from urllib.parse import urlparse
 
 
 async def check_call(program, *args, **kwargs):
@@ -13,12 +13,12 @@ async def check_call(program, *args, **kwargs):
 
 
 def sock_addr(addr):
-    parsed = uri.URI("//" + addr + "/")
+    parsed = urlparse("//" + addr + "/")
     return parsed.hostname, parsed.port
 
 
 def ssh_addr(config):
-    parsed = uri.URI("//" + config + "/")
+    parsed = urlparse("//" + config + "/")
     ret = {
         "known_hosts": None,
     }
@@ -38,19 +38,21 @@ def hostport(sockaddr):
 
 
 def ssh_uri(sockaddr, hide_pwd: bool = True):
-    if sockaddr.get("password") is None:
-        password = None
-    elif hide_pwd:
-        password = "***"
-    else:
-        password = sockaddr.get("password")
+    ret = ""
+    if sockaddr.get("username") is not None:
+        ret += sockaddr.get("username")
+    if sockaddr.get("password") is not None:
+        ret += ":" + ("***" if hide_pwd else sockaddr.get("password"))
 
-    return uri.URI(
-        username=sockaddr.get("username"),
-        password=password,
-        hostname=sockaddr.get("host"),
-        port=sockaddr.get("port"),
-    ).uri[2:-1]
+    if ret:
+        ret += "@"
+
+    ret += sockaddr.get("host")
+
+    if sockaddr.get("port") is not None:
+        ret += f":{sockaddr.get("port")}"
+
+    return ret
 
 
 def random_str(size=6, chars=string.ascii_uppercase + string.ascii_lowercase + string.digits):
