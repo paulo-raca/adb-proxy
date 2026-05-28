@@ -18,17 +18,17 @@ logger = logging.getLogger("UPnP")
 logger.setLevel(logging.INFO)
 
 
-def _local_ip_for(gateway_ip: str) -> str:
+def _local_ip_for(gateway_ip: str) -> IPv4Address:
     # Discover which local interface routes to the gateway.
     # UDP-connect is local-only (no packet leaves the host) and the kernel
     # picks the source IP it would use to reach the gateway.
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.connect((gateway_ip, 1))
-        return s.getsockname()[0]
+        return IPv4Address(s.getsockname()[0])
 
 
 class UPnP:
-    def __init__(self, igd: IgdDevice, lan_ip: str, gateway_ip: str, ext_ip: str) -> None:
+    def __init__(self, igd: IgdDevice, lan_ip: IPv4Address, gateway_ip: str, ext_ip: str) -> None:
         self.igd = igd
         self.lan_ip = lan_ip
         self.gateway_ip = gateway_ip
@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
     async def main() -> None:
         upnp = await UPnP.get()
-        async with upnp.map_port((upnp.lan_ip, 1234)) as portmap:
+        async with upnp.map_port((str(upnp.lan_ip), 1234)) as portmap:
             print(portmap)
             time.sleep(1)
 

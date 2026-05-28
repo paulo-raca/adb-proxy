@@ -446,7 +446,7 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
         from .upnp import UPnP
 
         upnp_client = await UPnP.get()
-        listen_address["host"] = upnp_client.lan_ip
+        listen_address["host"] = str(upnp_client.lan_ip)
         listen_address["port"] = 0
     else:
         upnp_client = None
