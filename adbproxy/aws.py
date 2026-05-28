@@ -167,7 +167,10 @@ async def upload(client, http_session, project_arn, uploads_to_delete, name, typ
 
 
 async def run(project_name, device_ids, device_pool, ssh_path):
-    async with aiobotocore.session.get_session().create_client("devicefarm") as client, aiohttp.ClientSession() as http_session:
+    async with (
+        aiobotocore.session.get_session().create_client("devicefarm", region_name="us-west-2") as client,
+        aiohttp.ClientSession() as http_session,
+    ):
         project_arn = await find_project(client, project_name)
 
         if device_ids:

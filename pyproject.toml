@@ -15,6 +15,7 @@ dependencies = [
 devicefarm = [
     "aiobotocore>=2.5.0",
     "aiohttp>=3.8",
+    "botocore[crt]",
 ]
 upnp = [
     "aioupnp @ git+https://github.com/paulo-raca/aioupnp.git@python3.10",
