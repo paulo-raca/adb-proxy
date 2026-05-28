@@ -36,7 +36,10 @@ class PortMapping:
         self.protocol = protocol
 
     def __str__(self):
-        return f"PortMapping({hostport(self.ext_addr)} -> {hostport(self.lan_addr)}, description={self.description}, protocol={self.protocol})"
+        return (
+            f"PortMapping({hostport(self.ext_addr)} -> {hostport(self.lan_addr)}, "
+            f"description={self.description}, protocol={self.protocol})"
+        )
 
     async def __aenter__(self):
         ext_port = await self.upnp.upnp.get_next_mapping(

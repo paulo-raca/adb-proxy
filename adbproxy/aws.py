@@ -199,7 +199,8 @@ async def run(project_name, device_ids, device_pool, ssh_path):
                     },
                     "test": {
                         "commands": [
-                            f'python -m adbproxy connect-reverse --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path, hide_pwd=False)}"'
+                            "python -m adbproxy connect-reverse --no-adb-reverse"
+                            f' -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path, hide_pwd=False)}"'
                         ]
                     },
                 },
