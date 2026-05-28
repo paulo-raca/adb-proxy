@@ -117,7 +117,6 @@ def main():
         parser_devicefarm_group.add_argument("--device", dest="device_ids", action="append", help="Device ID, ARN, Name or instance ID")
         parser_devicefarm.set_defaults(func=devicefarm)
     except ModuleNotFoundError:
-        print("AWS DeviceFarm support is not available. Install adbproxy with the 'aws' extra to enable it.")
         pass
 
     argcomplete.autocomplete(parser)

@@ -193,16 +193,13 @@ async def run(project_name, device_ids, device_pool, ssh_path):
                 "phases": {
                     "install": {
                         "commands": [
-                            "devicefarm-cli use python 3.10",
-                            "python -m venv env3",
-                            ". env3/bin/activate",
-                            "python -V",
-                            "python -m pip install git+https://github.com/paulo-raca/adb-proxy.git",
+                            "curl -LsSf https://astral.sh/uv/install.sh | sh",
                         ],
                     },
                     "test": {
                         "commands": [
-                            f'python -m adbproxy connect-reverse --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path, hide_pwd=False)}"'
+                            "uvx --from git+https://github.com/paulo-raca/adb-proxy.git adbproxy connect-reverse"
+                            f' --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path, hide_pwd=False)}"',
                         ]
                     },
                 },
