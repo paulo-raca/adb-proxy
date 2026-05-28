@@ -9,7 +9,7 @@ from importlib.resources import files
 from typing import TYPE_CHECKING, Any
 
 import aiobotocore.session
-import aiohttp
+import httpx
 import yaml
 
 from adbproxy.util import random_str
@@ -159,7 +159,7 @@ async def find_devices(client: DeviceFarmClient, *, project_arn: str, device_ids
 async def upload(
     *,
     client: DeviceFarmClient,
-    http_session: aiohttp.ClientSession,
+    http_session: httpx.AsyncClient,
     project_arn: str,
     name: str,
     type: UploadTypeType,
@@ -170,7 +170,7 @@ async def upload(
     arn = upload_info["arn"]
     try:
         # Perform the actual upload
-        await http_session.put(upload_info["url"], data=data)
+        await http_session.put(upload_info["url"], content=data)
 
         # Wait until upload is ready to use
         while True:
@@ -195,7 +195,7 @@ async def run(*, project_name: str, device_ids: list[str] | None, device_pool: s
 
     async with (
         aiobotocore.session.get_session().create_client("devicefarm", region_name="us-west-2") as client,
-        aiohttp.ClientSession() as http_session,
+        httpx.AsyncClient() as http_session,
     ):
         project_arn = await find_project_arn(client, project_name=project_name)
 
