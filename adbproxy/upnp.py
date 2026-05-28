@@ -40,12 +40,6 @@ class ActivePortMapping:
     description: str
     protocol: str
 
-    def __str__(self) -> str:
-        return (
-            f"PortMapping({hostport(self.ext_addr)} -> {hostport(self.lan_addr)}, "
-            f"description={self.description}, protocol={self.protocol})"
-        )
-
 
 class UPnP:
     def __init__(self, igd: IgdDevice, lan_ip: IPv4Address, gateway_ip: IPv4Address, ext_ip: IPv4Address) -> None:
