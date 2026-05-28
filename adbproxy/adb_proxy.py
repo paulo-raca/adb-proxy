@@ -496,15 +496,15 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                 logger.info("Reverse connection lost")
 
     try:
-        server = (
-            await asyncssh.listen_reverse(tunnel=ssh_client, client_factory=MySSHClient, acceptor=on_connected, **listen_address)
-        )._server
-        async with server:
+        async with await asyncssh.listen_reverse(
+            tunnel=ssh_client, client_factory=MySSHClient, acceptor=on_connected, **listen_address
+        ) as server:
             socket_addr = dict(listen_address)
             if ssh_client is None:
                 # Listening on a plain TCP socket
-                socket_addr["host"] = server.sockets[0].getsockname()[0]  # ty: ignore[unresolved-attribute]
-                socket_addr["port"] = server.sockets[0].getsockname()[1]  # ty: ignore[unresolved-attribute]
+                host, port, *_ = server.get_addresses()[0]
+                socket_addr["host"] = host
+                socket_addr["port"] = port
 
                 test_addrs = {
                     "0.0.0.0": socket.AF_INET,
@@ -521,7 +521,7 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
 
             else:
                 # Listening through a SSH tunnel
-                socket_addr["port"] = server.get_port()  # ty: ignore[unresolved-attribute]
+                socket_addr["port"] = server.get_port()
 
                 if ngrok_cmd:
                     async for row in ngrok_cmd.stdout:
@@ -619,15 +619,14 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
         logger.info("Disconnected")
 
 
-async def use_tunnels(func, ssh_tunnels=[], ssh_client=None, *args, **kwargs):
+async def use_tunnels(*, func, ssh_tunnels=(), ssh_client=None, **kwargs):
     if ssh_tunnels:
         async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
             logger.info(f"Jumping through SSH proxy: {ssh_uri(ssh_tunnels[0])}")
             return await use_tunnels(
+                func=func,
                 ssh_tunnels=ssh_tunnels[1:],
                 ssh_client=ssh_client,
-                func=func,
-                *args,  # ty: ignore[parameter-already-assigned]
                 **kwargs,
             )
 
