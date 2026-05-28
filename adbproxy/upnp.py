@@ -28,7 +28,7 @@ def _local_ip_for(gateway_ip: IPv4Address) -> IPv4Address:
 
 
 class UPnP:
-    def __init__(self, igd: IgdDevice, lan_ip: IPv4Address, gateway_ip: IPv4Address, ext_ip: str) -> None:
+    def __init__(self, igd: IgdDevice, lan_ip: IPv4Address, gateway_ip: IPv4Address, ext_ip: IPv4Address) -> None:
         self.igd = igd
         self.lan_ip = lan_ip
         self.gateway_ip = gateway_ip
@@ -54,12 +54,13 @@ class UPnP:
             raise RuntimeError(f"UPnP gateway LOCATION has no hostname: {location!r}")
         gateway_ip = IPv4Address(gateway_hostname)
         lan_ip = _local_ip_for(gateway_ip)
-        ext_ip = await igd.async_get_external_ip_address()
-        if ext_ip is None:
+        ext_ip_str = await igd.async_get_external_ip_address()
+        if ext_ip_str is None:
             raise RuntimeError("UPnP gateway did not report an external IP address")
+        ext_ip = IPv4Address(ext_ip_str)
         return UPnP(igd, lan_ip, gateway_ip, ext_ip)
 
-    def map_port(self, lan_addr: tuple[str, int], description: str = "UPnP", protocol: str = "TCP") -> "PortMapping":
+    def map_port(self, lan_addr: tuple[IPv4Address, int], description: str = "UPnP", protocol: str = "TCP") -> "PortMapping":
         return PortMapping(self, lan_addr, description, protocol)
 
 
@@ -68,10 +69,10 @@ class PortMapping:
     # Retry with a fresh random port on collision.
     _RETRIES = 5
 
-    def __init__(self, upnp: UPnP, lan_addr: tuple[str, int], description: str, protocol: str) -> None:
+    def __init__(self, upnp: UPnP, lan_addr: tuple[IPv4Address, int], description: str, protocol: str) -> None:
         self.upnp = upnp
         self.lan_addr = lan_addr
-        self.ext_addr: tuple[str, int] | None = None
+        self.ext_addr: tuple[IPv4Address, int] | None = None
         self.description = description
         self.protocol = protocol
 
@@ -82,7 +83,6 @@ class PortMapping:
         )
 
     async def __aenter__(self) -> "PortMapping":
-        internal_client = IPv4Address(self.lan_addr[0])
         last_err: UpnpError | None = None
         for _ in range(self._RETRIES):
             # Pick a random external port in the ephemeral range, away from the limits.
@@ -93,7 +93,7 @@ class PortMapping:
                     external_port=ext_port,
                     protocol=self.protocol,
                     internal_port=self.lan_addr[1],
-                    internal_client=internal_client,
+                    internal_client=self.lan_addr[0],
                     enabled=True,
                     description=self.description,
                     lease_duration=timedelta(0),
@@ -133,7 +133,7 @@ if __name__ == "__main__":
 
     async def main() -> None:
         upnp = await UPnP.get()
-        async with upnp.map_port((str(upnp.lan_ip), 1234)) as portmap:
+        async with upnp.map_port((upnp.lan_ip, 1234)) as portmap:
             print(portmap)
             time.sleep(1)
 
