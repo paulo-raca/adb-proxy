@@ -1,9 +1,8 @@
-import asyncio
 import secrets
 import socket
 import string
 from ipaddress import IPv4Address, IPv6Address
-from typing import TypeVar
+from typing import Any, TypeVar
 from urllib.parse import urlparse
 
 
@@ -21,21 +20,20 @@ def local_ip_for(target: IPAddressT) -> IPAddressT:
     return type(target)(host)
 
 
-async def check_call(program, *args, **kwargs):
-    proc = await asyncio.create_subprocess_exec(program, *args, **kwargs)
-    exitcode = await proc.wait()
-    if exitcode != 0:
-        raise Exception(f"{program} exited with code {exitcode}")
-
-
-def sock_addr(addr):
+def sock_addr(addr: str) -> tuple[str, int]:
     parsed = urlparse("//" + addr + "/")
+    if parsed.hostname is None or parsed.port is None:
+        raise ValueError(f"Invalid host:port {addr!r}")
     return parsed.hostname, parsed.port
 
 
-def ssh_addr(config):
+def hostport(sockaddr: tuple[str | IPv4Address | IPv6Address, int]) -> str:
+    return ssh_uri({"host": str(sockaddr[0]), "port": sockaddr[1]})
+
+
+def ssh_addr(config: str) -> dict[str, Any]:
     parsed = urlparse("//" + config + "/")
-    ret = {
+    ret: dict[str, Any] = {
         "known_hosts": None,
     }
     if parsed.username is not None:
@@ -49,27 +47,24 @@ def ssh_addr(config):
     return ret
 
 
-def hostport(sockaddr):
-    return ssh_uri({"host": sockaddr[0], "port": sockaddr[1]})
+def ssh_uri(sockaddr: dict[str, Any], hide_pwd: bool = True) -> str:
+    username = sockaddr.get("username")
+    password = sockaddr.get("password")
+    host = sockaddr.get("host", "")
+    port = sockaddr.get("port")
 
-
-def ssh_uri(sockaddr, hide_pwd: bool = True):
     ret = ""
-    if sockaddr.get("username") is not None:
-        ret += sockaddr.get("username")
-    if sockaddr.get("password") is not None:
-        ret += ":" + ("***" if hide_pwd else sockaddr.get("password"))
-
+    if username is not None:
+        ret += username
+    if password is not None:
+        ret += ":" + ("***" if hide_pwd else password)
     if ret:
         ret += "@"
-
-    ret += str(sockaddr.get("host"))
-
-    if sockaddr.get("port") is not None:
-        ret += f":{sockaddr.get('port')}"
-
+    ret += str(host)
+    if port is not None:
+        ret += f":{port}"
     return ret
 
 
-def random_str(size=6, chars=string.ascii_uppercase + string.ascii_lowercase + string.digits):
+def random_str(size: int, *, chars: str = string.ascii_uppercase + string.ascii_lowercase + string.digits) -> str:
     return "".join(secrets.choice(chars) for x in range(size))
