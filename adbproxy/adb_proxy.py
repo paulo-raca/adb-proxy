@@ -370,7 +370,9 @@ class AdbProxy:
 
         async def on_connected(r, w):
             logger.info(f"Connected to ADB server {hostport(local_endpoint.adb_sockaddr)} @ {local_endpoint.local_hostname}")
-            proxy_task[0] = asyncio.create_task(AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_name, reverse_connection_supported).go())
+            proxy_task[0] = asyncio.create_task(
+                AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_name, reverse_connection_supported).go()
+            )
 
         server, server_addr = await local_endpoint.listen(on_connected)
         try:
@@ -382,6 +384,7 @@ class AdbProxy:
 
         try:
             if proxy_task[0]:
+
                 async def check_device_alive():
                     await read_stream(remote_endpoint, device_path(device_id), "shell:cat -")
                     raise EOFError(f"Disconnected from the device {device_id} @ {remote_endpoint.local_hostname} ({device_name})")
@@ -494,8 +497,8 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
             socket_addr = dict(listen_address)
             if ssh_client is None:
                 # Listening on a plain TCP socket
-                socket_addr["host"] = server.sockets[0].getsockname()[0]
-                socket_addr["port"] = server.sockets[0].getsockname()[1]
+                socket_addr["host"] = server.sockets[0].getsockname()[0]  # ty: ignore[unresolved-attribute]
+                socket_addr["port"] = server.sockets[0].getsockname()[1]  # ty: ignore[unresolved-attribute]
 
                 test_addrs = {
                     "0.0.0.0": socket.AF_INET,
@@ -512,7 +515,7 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
 
             else:
                 # Listening through a SSH tunnel
-                socket_addr["port"] = server.get_port()
+                socket_addr["port"] = server.get_port()  # ty: ignore[unresolved-attribute]
 
                 if ngrok_cmd:
                     async for row in ngrok_cmd.stdout:
@@ -614,6 +617,12 @@ async def use_tunnels(func, ssh_tunnels=[], ssh_client=None, *args, **kwargs):
     if ssh_tunnels:
         async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
             logger.info(f"Jumping through SSH proxy: {ssh_uri(ssh_tunnels[0])}")
-            return await use_tunnels(ssh_tunnels=ssh_tunnels[1:], ssh_client=ssh_client, func=func, *args, **kwargs)
+            return await use_tunnels(
+                ssh_tunnels=ssh_tunnels[1:],
+                ssh_client=ssh_client,
+                func=func,
+                *args,  # ty: ignore[parameter-already-assigned]
+                **kwargs,
+            )
 
     return await func(ssh_client=ssh_client, **kwargs)
