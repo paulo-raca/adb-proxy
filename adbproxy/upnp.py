@@ -39,8 +39,8 @@ class UPnP:
         self.ext_ip = ext_ip
         logger.info(f"UPnP Gateway found! Local IP={self.lan_ip}, Gateway IP={self.gateway_ip}, External IP={self.ext_ip}")
 
-    @staticmethod
-    async def get() -> "UPnP":
+    @classmethod
+    async def discover(cls) -> "UPnP":
         responses = await IgdDevice.async_search(timeout=4)
         # Prefer IGD v2 if multiple gateways respond.
         responses_sorted = sorted(responses, key=lambda r: r.get("ST", ""), reverse=True)
@@ -71,7 +71,7 @@ class UPnP:
         if ext_ip_str is None:
             raise RuntimeError("UPnP gateway did not report an external IP address")
         ext_ip = IPv4Address(ext_ip_str)
-        return UPnP(igd, lan_ip, gateway_ip, ext_ip)
+        return cls(igd, lan_ip, gateway_ip, ext_ip)
 
     @asynccontextmanager
     async def map_port(
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     logging.basicConfig()
 
     async def main() -> None:
-        upnp = await UPnP.get()
+        upnp = await UPnP.discover()
         async with upnp.map_port((upnp.lan_ip, 1234)) as portmap:
             print(portmap)
             time.sleep(1)

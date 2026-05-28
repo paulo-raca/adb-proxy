@@ -446,7 +446,7 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
             raise Exception("Use either UPnP or SSH tunnels")
         from .upnp import UPnP
 
-        upnp_client = await UPnP.get()
+        upnp_client = await UPnP.discover()
         listen_address["host"] = str(upnp_client.lan_ip)
         listen_address["port"] = 0
     else:
