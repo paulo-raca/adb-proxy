@@ -60,7 +60,7 @@ class UPnP:
                 continue
             break
         else:
-            raise RuntimeError("No UPnP IGD gateway with an IPv4 LOCATION found on the local network")
+            raise RuntimeError("No IPv4 UPnP IGD gateway found on the local network")
 
         factory = UpnpFactory(AiohttpRequester())
         device = await factory.async_create_device(location)
