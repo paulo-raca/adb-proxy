@@ -56,6 +56,49 @@ class Endpoint(ABC):
     async def connect_to_adb(self) -> tuple[StreamReader, StreamWriter]:
         return await self.connect(self.adb_sockaddr)
 
+    async def open_stream(self, *path: str) -> tuple[StreamReader, StreamWriter]:
+        """Open a stream to the device through the ADB server."""
+        reader, writer = await self.connect_to_adb()
+        try:
+            for cmd in path:
+                cmd_bytes = cmd.encode("utf-8")
+                data = "{0:04X}".format(len(cmd_bytes)).encode("utf-8") + cmd_bytes
+                writer.write(data)
+                await writer.drain()
+
+                status = await reader.readexactly(4)
+                if status != b"OKAY":
+                    if status == b"FAIL":
+                        size = int(await reader.readexactly(4), 16)
+                        message = (await reader.readexactly(size)).decode("utf-8")
+                        raise Exception(f"Cannot run '{cmd}': {status}: {message}")
+                    else:
+                        raise Exception(f"Cannot run '{cmd}': Unknown status {status}")
+
+            return reader, writer
+        except Exception:
+            writer.close()
+            raise
+
+    async def read_stream(self, *path: str) -> bytes:
+        """Open a stream, read its contents to EOF, and close."""
+        reader, writer = await self.open_stream(*path)
+        try:
+            return await reader.read()
+        finally:
+            writer.close()
+
+    async def devices(self) -> list[str]:
+        """List ADB device serials connected to this endpoint's ADB server."""
+        lines = (await self.read_stream("host:devices"))[4:].decode("utf-8").splitlines()
+        ret = []
+        for line in lines:
+            line = line.strip()
+            name, type = line.split("\t")
+            if type == "device":
+                ret.append(name)
+        return ret
+
     @abstractmethod
     async def connect(self, sockaddr: tuple[str, int]) -> tuple[StreamReader, StreamWriter]:
         pass
