@@ -1,5 +1,6 @@
 import logging
 import socket
+from dataclasses import dataclass
 from datetime import timedelta
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from random import randrange
@@ -67,6 +68,20 @@ class UPnP:
         return PortMapping(self, lan_addr, description, protocol)
 
 
+@dataclass(frozen=True)
+class ActivePortMapping:
+    lan_addr: tuple[IPAddress, int]
+    ext_addr: tuple[IPAddress, int]
+    description: str
+    protocol: str
+
+    def __str__(self) -> str:
+        return (
+            f"PortMapping({hostport(self.ext_addr)} -> {hostport(self.lan_addr)}, "
+            f"description={self.description}, protocol={self.protocol})"
+        )
+
+
 class PortMapping:
     # Some routers reject mappings whose external port already exists.
     # Retry with a fresh random port on collision.
@@ -75,17 +90,11 @@ class PortMapping:
     def __init__(self, upnp: UPnP, lan_addr: tuple[IPAddress, int], description: str, protocol: str) -> None:
         self.upnp = upnp
         self.lan_addr = lan_addr
-        self.ext_addr: tuple[IPAddress, int] | None = None
         self.description = description
         self.protocol = protocol
+        self._active: ActivePortMapping | None = None
 
-    def __str__(self) -> str:
-        return (
-            f"PortMapping({hostport(self.ext_addr)} -> {hostport(self.lan_addr)}, "
-            f"description={self.description}, protocol={self.protocol})"
-        )
-
-    async def __aenter__(self) -> "PortMapping":
+    async def __aenter__(self) -> ActivePortMapping:
         internal_client = self.lan_addr[0]
         if not isinstance(internal_client, IPv4Address):
             raise RuntimeError(f"UPnP IGD port mapping is IPv4-only, got {internal_client!r}")
@@ -107,9 +116,14 @@ class PortMapping:
             except UpnpError as e:
                 last_err = e
                 continue
-            self.ext_addr = (self.upnp.ext_ip, ext_port)
-            logger.info(f"Created external port mapping: {hostport(self.ext_addr)} -> {hostport(self.lan_addr)}")
-            return self
+            self._active = ActivePortMapping(
+                lan_addr=self.lan_addr,
+                ext_addr=(self.upnp.ext_ip, ext_port),
+                description=self.description,
+                protocol=self.protocol,
+            )
+            logger.info(f"Created external port mapping: {hostport(self._active.ext_addr)} -> {hostport(self._active.lan_addr)}")
+            return self._active
         raise RuntimeError(f"Failed to create UPnP port mapping after {self._RETRIES} retries") from last_err
 
     async def __aexit__(
@@ -118,16 +132,16 @@ class PortMapping:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
-        if not self.ext_addr:
+        if self._active is None:
             return
         try:
             await self.upnp.igd.async_delete_port_mapping(
                 remote_host=IPv4Address("0.0.0.0"),
-                external_port=self.ext_addr[1],
-                protocol=self.protocol,
+                external_port=self._active.ext_addr[1],
+                protocol=self._active.protocol,
             )
         except UpnpError as e:
-            logger.warning(f"Failed to remove port mapping {hostport(self.ext_addr)}: {e}")
+            logger.warning(f"Failed to remove port mapping {hostport(self._active.ext_addr)}: {e}")
 
 
 # Quick test: python3 -m adbproxy.upnp
