@@ -130,13 +130,14 @@ class AdbProxy:
         local_endpoint,
         device_endpoint,
         device_id,
-        device_name,
+        device_props,
         reverse_connection_supported=True,
     ):
         self.local_endpoint = local_endpoint
         self.device_endpoint = device_endpoint
         self.device_id = device_id
-        self.device_name = device_name
+        self.device_props = device_props
+        self.device_name = device_props.get("ro.product.model", device_id)
         self.protocol_version = 0x1000000
         self.max_data_len = 256 * 1024
         self.reverse_connection_supported = reverse_connection_supported
@@ -288,11 +289,12 @@ class AdbProxy:
         try:
             logger.info(f"Connected to device {self.device_id} @ {self.device_endpoint.local_hostname} ({self.device_name})")
 
+            banner_body = ";".join(f"{k}={v}" for k, v in self.device_props.items())
             await self.send_cmd(
                 b"CNXN",
                 self.protocol_version,
                 self.max_data_len,
-                f"device:wrapped-{self.device_id}:{self.device_name}",
+                f"device::{banner_body}",
             )
             # Wait until receives a CNXN
             while True:
@@ -369,15 +371,28 @@ class AdbProxy:
         if device_id not in devices:
             raise Exception(f"device '{device_id}' not found")
 
-        # Fetch device name -- also acts as a quick test that the device is valid
-        device_name = (await remote_endpoint.read_stream(device_path(device_id), "shell:getprop ro.product.model")).decode("utf-8").strip()
+        # Fetch product identification props in one shot — they populate the CNXN banner
+        # so `adb devices -l` shows model/name/device instead of just the proxy's ip:port.
+        async def _getprop(prop):
+            return (await remote_endpoint.read_stream(device_path(device_id), f"shell:getprop {prop}")).decode("utf-8").strip()
+
+        prod_name, prod_model, prod_device = await asyncio.gather(
+            _getprop("ro.product.name"),
+            _getprop("ro.product.model"),
+            _getprop("ro.product.device"),
+        )
+        device_props = {
+            "ro.product.name": f"{prod_name}@{local_endpoint.local_hostname}",
+            "ro.product.model": prod_model,
+            "ro.product.device": prod_device,
+        }
 
         proxy_task = [None]
 
         async def on_connected(r, w):
             logger.info(f"Connected to ADB server {hostport(local_endpoint.adb_sockaddr)} @ {local_endpoint.local_hostname}")
             proxy_task[0] = asyncio.create_task(
-                AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_name, reverse_connection_supported).go()
+                AdbProxy(r, w, local_endpoint, remote_endpoint, device_id, device_props, reverse_connection_supported).go()
             )
 
         server, server_addr = await local_endpoint.listen(on_connected)
@@ -393,7 +408,7 @@ class AdbProxy:
 
                 async def check_device_alive():
                     await remote_endpoint.read_stream(device_path(device_id), "shell:cat -")
-                    raise EOFError(f"Disconnected from the device {device_id} @ {remote_endpoint.local_hostname} ({device_name})")
+                    raise EOFError(f"Disconnected from the device {device_id} @ {remote_endpoint.local_hostname} ({prod_model})")
 
                 wait_tasks = {proxy_task[0], asyncio.create_task(check_device_alive())}
                 if wait_for is not None:
