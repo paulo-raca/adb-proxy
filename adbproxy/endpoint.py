@@ -1,8 +1,20 @@
 import asyncio
 import socket
 from abc import ABC, abstractmethod
+from typing import Protocol
 
 import asyncssh
+
+
+class StreamReader(Protocol):
+    async def read(self, n: int = -1) -> bytes: ...
+    async def readexactly(self, n: int) -> bytes: ...
+
+
+class StreamWriter(Protocol):
+    def write(self, data: bytes) -> None: ...
+    async def drain(self) -> None: ...
+    def close(self) -> None: ...
 
 
 class Endpoint(ABC):

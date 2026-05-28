@@ -7,7 +7,7 @@ from .adb_proxy import connect, connect_reverse, listen_reverse, use_tunnels
 from .util import sock_addr, ssh_addr
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Creates ADB Proxy connections")
 
     ssh_jump_parser = argparse.ArgumentParser(add_help=False)
