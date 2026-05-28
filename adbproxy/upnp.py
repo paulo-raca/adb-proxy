@@ -83,8 +83,8 @@ class UPnP:
         last_err: UpnpError | None = None
         ext_port: int | None = None
         for _ in range(_PORT_MAPPING_RETRIES):
-            # Pick a random external port in the ephemeral range, away from the limits.
-            candidate = randrange(1024, 65536 - 1024)
+            # Pick a random external port in the IANA dynamic/ephemeral range.
+            candidate = randrange(49152, 65536)
             try:
                 await self.igd.async_add_port_mapping(
                     remote_host=IPv4Address("0.0.0.0"),
