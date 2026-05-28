@@ -42,7 +42,7 @@ allow-direct-references = true
 packages = ["adbproxy"]
 
 [tool.ruff]
-line-length = 149
+line-length = 139
 target-version = "py310"
 
 [tool.ruff.lint]

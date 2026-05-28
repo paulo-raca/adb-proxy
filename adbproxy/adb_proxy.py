@@ -3,8 +3,8 @@
 #
 # ADB Proxy
 #
-# In order to access a device in a remote ADB server, the ADB proxy connects to the local ADB server acting like a device, connected via TCP/IP,
-# and to the remote ADB server acting like a client accessing a local device
+# In order to access a device in a remote ADB server, the ADB proxy connects to the local ADB server acting like a
+# device, connected via TCP/IP, and to the remote ADB server acting like a client accessing a local device
 #
 # The ADB protocol is extremely simple, and simply allows device and server to start named streams.
 # However, the protocol used by client<=>ADB-Server and ADB-Server<=>device are a bit different:
@@ -188,7 +188,9 @@ class AdbProxy:
 
         listener, listen_addr = await self.device_endpoint.listen(on_connected)
         proxy = f"tcp:{hostport(listen_addr)}"
-        tunnel_desc = f"{remote} @ Device -> {proxy} @ {self.device_endpoint.local_hostname} -> {local} @ {self.local_endpoint.local_hostname}"
+        tunnel_desc = (
+            f"{remote} @ Device -> {proxy} @ {self.device_endpoint.local_hostname} -> {local} @ {self.local_endpoint.local_hostname}"
+        )
         cmd = f"reverse:forward:{remote};{proxy}"
 
         ret = await self.read_stream(cmd)
@@ -364,7 +366,9 @@ class AdbProxy:
             raise Exception(f"device '{device_id}' not found")
 
         # Fetch device name -- also acts as a quick test that the device is valid
-        device_name = (await read_stream(remote_endpoint, device_path(device_id), "shell:getprop ro.product.model")).decode("utf-8").strip()
+        device_name = (
+            (await read_stream(remote_endpoint, device_path(device_id), "shell:getprop ro.product.model")).decode("utf-8").strip()
+        )
 
         proxy_task = [None]
 
@@ -492,7 +496,9 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                 logger.info("Reverse connection lost")
 
     try:
-        server = (await asyncssh.listen_reverse(tunnel=ssh_client, client_factory=MySSHClient, acceptor=on_connected, **listen_address))._server
+        server = (
+            await asyncssh.listen_reverse(tunnel=ssh_client, client_factory=MySSHClient, acceptor=on_connected, **listen_address)
+        )._server
         async with server:
             socket_addr = dict(listen_address)
             if ssh_client is None:

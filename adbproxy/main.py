@@ -110,7 +110,9 @@ def main():
     try:
         from .aws import devicefarm
 
-        parser_devicefarm = subparsers.add_parser("devicefarm", parents=[listen_reverse_base_parser], help="Awaits connections from DeviceFarm")
+        parser_devicefarm = subparsers.add_parser(
+            "devicefarm", parents=[listen_reverse_base_parser], help="Awaits connections from DeviceFarm"
+        )
         parser_devicefarm.add_argument("--project", dest="project_name", default="adbproxy", help="Project Name")
         parser_devicefarm_group = parser_devicefarm.add_mutually_exclusive_group()
         parser_devicefarm_group.add_argument("--device-pool", dest="device_pool", default="Default Pool", help="Device Pool")
