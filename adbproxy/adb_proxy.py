@@ -23,6 +23,7 @@ import re
 import socket
 import struct
 import traceback
+from ipaddress import IPv4Address
 
 import asyncssh
 
@@ -445,8 +446,8 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
             raise Exception("Use either UPnP or SSH tunnels")
         from .upnp import UPnP
 
-        upnp_client = await UPnP.get()
-        listen_address["host"] = upnp_client.lan_ip
+        upnp_client = await UPnP.discover()
+        listen_address["host"] = str(upnp_client.lan_ip)
         listen_address["port"] = 0
     else:
         upnp_client = None
@@ -549,9 +550,9 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
                     await asyncio.Semaphore(0).acquire()
 
             if upnp_client:
-                async with upnp_client.map_port((socket_addr["host"], socket_addr["port"]), "ADB Proxy") as port_map:
-                    socket_addr["host"] = port_map.ext_addr[0]
-                    socket_addr["port"] = port_map.ext_addr[1]
+                async with upnp_client.map_port((IPv4Address(socket_addr["host"]), socket_addr["port"]), "ADB Proxy") as port_map:
+                    socket_addr["host"] = str(port_map.wan_addr[0])
+                    socket_addr["port"] = port_map.wan_addr[1]
                     await wait_until_complete()
             else:
                 await wait_until_complete()

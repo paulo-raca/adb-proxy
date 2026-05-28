@@ -1,7 +1,24 @@
 import asyncio
 import secrets
+import socket
 import string
+from ipaddress import IPv4Address, IPv6Address
+from typing import TypeVar
 from urllib.parse import urlparse
+
+
+IPAddressT = TypeVar("IPAddressT", IPv4Address, IPv6Address)
+
+
+def local_ip_for(target: IPAddressT) -> IPAddressT:
+    # Discover which local interface routes to `target`. UDP-connect is
+    # local-only (no packet leaves the host) and the kernel picks the
+    # source IP it would use to reach the target.
+    family = socket.AF_INET6 if isinstance(target, IPv6Address) else socket.AF_INET
+    with socket.socket(family, socket.SOCK_DGRAM) as s:
+        s.connect((str(target), 1))
+        host = s.getsockname()[0]
+    return type(target)(host)
 
 
 async def check_call(program, *args, **kwargs):
@@ -46,7 +63,7 @@ def ssh_uri(sockaddr, hide_pwd: bool = True):
     if ret:
         ret += "@"
 
-    ret += sockaddr.get("host")
+    ret += str(sockaddr.get("host"))
 
     if sockaddr.get("port") is not None:
         ret += f":{sockaddr.get('port')}"
