@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from importlib.resources import files
+from typing import TYPE_CHECKING, Any
 
 import aiobotocore.session
 import aiohttp
@@ -10,14 +15,20 @@ import yaml
 from adbproxy.util import random_str
 
 from .adb_proxy import listen_reverse
-from .util import ssh_uri
+from .util import gather_contexts, ssh_uri
+
+
+if TYPE_CHECKING:
+    from types_aiobotocore_devicefarm import DeviceFarmClient
+    from types_aiobotocore_devicefarm.literals import UploadTypeType
+    from types_aiobotocore_devicefarm.type_defs import DeviceFilterTypeDef, ScheduleRunRequestTypeDef
 
 
 logger = logging.getLogger("DeviceFarm")
 logger.setLevel(logging.INFO)
 
 
-def arn_to_url(arn):
+def arn_to_url(arn: str) -> str:
     """
     Maps an ARN to its URL on AWS console
 
@@ -83,7 +94,7 @@ def arn_to_url(arn):
     return ret
 
 
-async def find_project(client, project_name):
+async def find_project_arn(client: DeviceFarmClient, *, project_name: str) -> str:
     async for page in client.get_paginator("list_projects").paginate():
         for project in page["projects"]:
             if project["name"] == project_name:
@@ -92,7 +103,7 @@ async def find_project(client, project_name):
     raise KeyError(f"Project not found: {project_name}")
 
 
-async def find_devicepool(client, project_arn, device_pool):
+async def find_devicepool_arn(client: DeviceFarmClient, *, project_arn: str, device_pool: str) -> str:
     async for page in client.get_paginator("list_device_pools").paginate(arn=project_arn):
         for devicepool in page["devicePools"]:
             if devicepool["name"] == device_pool:
@@ -101,13 +112,11 @@ async def find_devicepool(client, project_arn, device_pool):
     raise KeyError(f"Devicepool not found: {device_pool}")
 
 
-async def find_devices(client, project_arn, device_ids):
+async def find_devices(client: DeviceFarmClient, *, project_arn: str, device_ids: list[str]) -> list[DeviceFilterTypeDef]:
     unmatched_ids = set(device_ids)
 
-    matched_device_names = []
-    matched_device_arns = []
-    matched_instance_names = []
-    matched_instance_arns = []
+    matched_devices: dict[str, str] = {}  # arn -> display name
+    matched_instances: dict[str, str] = {}  # instance arn -> display name
     async for page in client.get_paginator("list_devices").paginate(arn=project_arn):
         for device in page["devices"]:
             device_name = device["name"]
@@ -118,8 +127,7 @@ async def find_devices(client, project_arn, device_ids):
             if device["fleetType"] == "PUBLIC":
                 for device_id in device_ids:
                     if device_id in [device_name, device_name_os, device_arn, device_arn_suffix]:
-                        matched_device_names.append(device_name_os)
-                        matched_device_arns.append(device_arn)
+                        matched_devices[device_arn] = device_name_os
                         unmatched_ids.discard(device_id)
             else:
                 for instance in device.get("instances", []):
@@ -129,119 +137,127 @@ async def find_devices(client, project_arn, device_ids):
 
                     for device_id in device_ids:
                         if device_id in [instance_arn, instance_arn_suffix, device_name_os_instance]:
-                            matched_instance_names.append(device_name_os_instance)
-                            matched_instance_arns.append(instance_arn)
+                            matched_instances[instance_arn] = device_name_os_instance
                             unmatched_ids.discard(device_id)
 
     if unmatched_ids:
         raise KeyError(f"Devices not found: {', '.join(unmatched_ids)}")
-    elif matched_device_names and matched_instance_names:
-        raise ValueError(f"You cannot mix devices ({', '.join(matched_device_names)}) and instances ({', '.join(matched_instance_names)})")
-    elif matched_instance_names:
-        logger.info(f"Using instances: {', '.join(matched_instance_names)}")
-        return [{"attribute": "INSTANCE_ARN", "operator": "IN", "values": matched_instance_arns}]
-    elif matched_device_names:
-        logger.info(f"Using devices: {', '.join(matched_device_names)}")
-        return [{"attribute": "ARN", "operator": "IN", "values": matched_device_arns}]
+    elif matched_devices and matched_instances:
+        raise ValueError(
+            f"You cannot mix devices ({', '.join(matched_devices.values())}) and instances ({', '.join(matched_instances.values())})"
+        )
+    elif matched_instances:
+        logger.info(f"Using instances: {', '.join(matched_instances.values())}")
+        return [{"attribute": "INSTANCE_ARN", "operator": "IN", "values": list(matched_instances)}]
+    elif matched_devices:
+        logger.info(f"Using devices: {', '.join(matched_devices.values())}")
+        return [{"attribute": "ARN", "operator": "IN", "values": list(matched_devices)}]
+    raise ValueError("No devices matched")
 
 
-async def upload(client, http_session, project_arn, uploads_to_delete, name, type, data):
+@asynccontextmanager
+async def upload(
+    *,
+    client: DeviceFarmClient,
+    http_session: aiohttp.ClientSession,
+    project_arn: str,
+    name: str,
+    type: UploadTypeType,
+    data: bytes,
+) -> AsyncIterator[str]:
     # Create the upload placeholder
     upload_info = (await client.create_upload(projectArn=project_arn, name=name, type=type))["upload"]
-    uploads_to_delete.append((name, type, upload_info["arn"]))
+    arn = upload_info["arn"]
+    try:
+        # Perform the actual upload
+        await http_session.put(upload_info["url"], data=data)
 
-    # Perform the actual upload
-    await http_session.put(upload_info["url"], data=data)
+        # Wait until upload is ready to use
+        while True:
+            upload_status = (await client.get_upload(arn=arn))["upload"]["status"]
+            if upload_status == "SUCCEEDED":
+                logger.info(f"Uploaded {name} ({type})")
+                break
+            elif upload_status == "FAILED":
+                raise IOError(f"Upload failed: {name}")
+            else:
+                logger.debug(f"Upload not ready yet: {name} ({type})")
+                await asyncio.sleep(1)
 
-    # Wait until upload is ready to use
-    while True:
-        upload_status = (await client.get_upload(arn=upload_info["arn"]))["upload"]["status"]
-        if upload_status == "SUCCEEDED":
-            logger.info(f"Uploaded {name} ({type})")
-            return upload_info["arn"]
-        elif upload_status == "FAILED":
-            raise IOError("Upload failed: %s" % (name))
-        else:
-            logger.debug(f"Upload not ready yet: {name} ({type})")
-            await asyncio.sleep(1)
+        yield arn
+    finally:
+        await client.delete_upload(arn=arn)
+        logger.info(f"Deleted upload: {name} ({type})")
 
 
-async def run(project_name, device_ids, device_pool, ssh_path):
+async def run(*, project_name: str, device_ids: list[str] | None, device_pool: str | None, ssh_path: dict[str, Any]) -> None:
+    assert bool(device_ids) != bool(device_pool), "Specify exactly one of device_ids or device_pool"
+
     async with (
         aiobotocore.session.get_session().create_client("devicefarm", region_name="us-west-2") as client,
         aiohttp.ClientSession() as http_session,
     ):
-        project_arn = await find_project(client, project_name)
+        project_arn = await find_project_arn(client, project_name=project_name)
 
-        if device_ids:
-            device_filter = {
-                "deviceSelectionConfiguration": {
-                    "filters": await find_devices(client, project_arn, device_ids),
-                    "maxDevices": 999,
-                }
-            }
-        else:
-            device_filter = {"devicePoolArn": await find_devicepool(client, project_arn, device_pool)}
+        dummy_apk = (files("adbproxy") / "dummy.apk").read_bytes()
 
-        uploads_to_delete = []
-        try:
-            dummy_apk = (files("adbproxy") / "dummy.apk").read_bytes()
-
-            test_spec = {
-                "version": 0.1,
-                "android_test_host": "amazon_linux_2",
-                "phases": {
-                    "install": {
-                        "commands": [
-                            "curl -LsSf https://astral.sh/uv/install.sh | sh",
-                        ],
-                    },
-                    "test": {
-                        "commands": [
-                            "uvx --from git+https://github.com/paulo-raca/adb-proxy.git adbproxy connect-reverse"
-                            f' --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path, hide_pwd=False)}"',
-                        ]
-                    },
+        test_spec = {
+            "version": 0.1,
+            "android_test_host": "amazon_linux_2",
+            "phases": {
+                "install": {
+                    "commands": [
+                        "curl -LsSf https://astral.sh/uv/install.sh | sh",
+                    ],
                 },
-            }
+                "test": {
+                    "commands": [
+                        "uvx --from git+https://github.com/paulo-raca/adb-proxy.git adbproxy connect-reverse"
+                        f' --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path, hide_pwd=False)}"',
+                    ]
+                },
+            },
+        }
 
-            main_apk_arn, test_apk_arn, testspec_arn = await asyncio.gather(
-                upload(
-                    client,
-                    http_session,
-                    project_arn,
-                    uploads_to_delete,
-                    "dummy.apk",
-                    type="ANDROID_APP",
-                    data=dummy_apk,
-                ),
-                upload(
-                    client,
-                    http_session,
-                    project_arn,
-                    uploads_to_delete,
-                    "dummy-test.apk",
-                    type="INSTRUMENTATION_TEST_PACKAGE",
-                    data=dummy_apk,
-                ),
-                upload(
-                    client,
-                    http_session,
-                    project_arn,
-                    uploads_to_delete,
-                    "adb-proxy-testspec.yaml",
-                    type="INSTRUMENTATION_TEST_SPEC",
-                    data=yaml.dump(test_spec, default_flow_style=False, sort_keys=False).encode("utf-8"),
-                ),
-            )
-
-            run_config = {
+        async with gather_contexts(
+            upload(
+                client=client,
+                http_session=http_session,
+                project_arn=project_arn,
+                name="dummy.apk",
+                type="ANDROID_APP",
+                data=dummy_apk,
+            ),
+            upload(
+                client=client,
+                http_session=http_session,
+                project_arn=project_arn,
+                name="dummy-test.apk",
+                type="INSTRUMENTATION_TEST_PACKAGE",
+                data=dummy_apk,
+            ),
+            upload(
+                client=client,
+                http_session=http_session,
+                project_arn=project_arn,
+                name="adb-proxy-testspec.yaml",
+                type="INSTRUMENTATION_TEST_SPEC",
+                data=yaml.dump(test_spec, default_flow_style=False, sort_keys=False).encode("utf-8"),
+            ),
+        ) as (main_apk_arn, test_apk_arn, testspec_arn):
+            run_config: ScheduleRunRequestTypeDef = {
                 "name": "ADB Proxy",
                 "projectArn": project_arn,
                 "appArn": main_apk_arn,
                 "test": {"type": "INSTRUMENTATION", "testPackageArn": test_apk_arn, "testSpecArn": testspec_arn},
             }
-            run_config.update(device_filter)
+            if device_ids:
+                run_config["deviceSelectionConfiguration"] = {
+                    "filters": await find_devices(client, project_arn=project_arn, device_ids=device_ids),
+                    "maxDevices": 9999,
+                }
+            if device_pool:
+                run_config["devicePoolArn"] = await find_devicepool_arn(client, project_arn=project_arn, device_pool=device_pool)
 
             run = (await client.schedule_run(**run_config))["run"]
             logger.info(f"Job created: {arn_to_url(run['arn'])}")
@@ -263,17 +279,12 @@ async def run(project_name, device_ids, device_pool, ssh_path):
             finally:
                 await client.stop_run(arn=run["arn"])
 
-        finally:
-            for upload_name, upload_type, upload_arn in uploads_to_delete:
-                await client.delete_upload(arn=upload_arn)
-                logger.info(f"Deleted uploaded: {upload_name} ({upload_type})")
 
-
-async def devicefarm(project_name, device_ids, device_pool, *args, **kwargs):
+async def devicefarm(project_name: str, device_ids: list[str] | None, device_pool: str | None, **kwargs: Any) -> Any:
     # For security, uses a random password to secure the connection
     kwargs["listen_address"].setdefault("password", random_str(16))
 
-    async def listen_until(socket_addr, ssh_client):
-        await run(project_name, device_ids, device_pool, socket_addr)
+    async def listen_until(socket_addr: dict[str, Any], ssh_client: DeviceFarmClient) -> None:
+        await run(project_name=project_name, device_ids=device_ids, device_pool=device_pool, ssh_path=socket_addr)
 
-    return await listen_reverse(*args, **kwargs, wait_for=listen_until)
+    return await listen_reverse(**kwargs, wait_for=listen_until)

@@ -1,12 +1,27 @@
+import asyncio
 import secrets
 import socket
 import string
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from ipaddress import IPv4Address, IPv6Address
 from typing import Any, TypeVar
 from urllib.parse import urlparse
 
 
 IPAddressT = TypeVar("IPAddressT", IPv4Address, IPv6Address)
+
+
+@asynccontextmanager
+async def gather_contexts(*cms: AbstractAsyncContextManager[Any]) -> AsyncIterator[list[Any]]:
+    """Enter several async context managers concurrently; exit in reverse order on exit.
+
+    Usage:
+        async with gather_contexts(cm1, cm2, cm3) as (v1, v2, v3):
+            ...
+    """
+    async with AsyncExitStack() as stack:
+        yield await asyncio.gather(*(stack.enter_async_context(cm) for cm in cms))
 
 
 def local_ip_for(target: IPAddressT) -> IPAddressT:
