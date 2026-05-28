@@ -424,8 +424,8 @@ async def connect(
     ssh_client=None,
 ):
     logger.info("Connecting...")
-    local_endpoint = await Endpoint.of(host_adb_addr)
-    remote_endpoint = await Endpoint.of(device_adb_addr, ssh_client)
+    local_endpoint = await Endpoint.of(adb_sockaddr=host_adb_addr)
+    remote_endpoint = await Endpoint.of(adb_sockaddr=device_adb_addr, ssh_client=ssh_client)
 
     if connect_cmd:
 
