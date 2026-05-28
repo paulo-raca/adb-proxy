@@ -1,7 +1,14 @@
 import logging
+import socket
+from datetime import timedelta
+from ipaddress import IPv4Address
 from random import randrange
+from urllib.parse import urlparse
 
-import aioupnp.upnp as aioupnp
+from async_upnp_client.aiohttp import AiohttpRequester
+from async_upnp_client.client_factory import UpnpFactory
+from async_upnp_client.exceptions import UpnpError
+from async_upnp_client.profiles.igd import IgdDevice
 
 from .util import hostport
 
@@ -10,9 +17,18 @@ logger = logging.getLogger("UPnP")
 logger.setLevel(logging.INFO)
 
 
+def _local_ip_for(gateway_ip):
+    # Discover which local interface routes to the gateway.
+    # UDP-connect is local-only (no packet leaves the host) and the kernel
+    # picks the source IP it would use to reach the gateway.
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.connect((gateway_ip, 1))
+        return s.getsockname()[0]
+
+
 class UPnP:
-    def __init__(self, upnp, lan_ip, gateway_ip, ext_ip):
-        self.upnp = upnp
+    def __init__(self, igd, lan_ip, gateway_ip, ext_ip):
+        self.igd = igd
         self.lan_ip = lan_ip
         self.gateway_ip = gateway_ip
         self.ext_ip = ext_ip
@@ -20,14 +36,32 @@ class UPnP:
 
     @staticmethod
     async def get():
-        upnp = await aioupnp.UPnP.discover()
-        return UPnP(upnp, upnp.lan_address, upnp.gateway_address, await upnp.get_external_ip())
+        responses = await IgdDevice.async_search(timeout=4)
+        if not responses:
+            raise RuntimeError("No UPnP IGD gateway found on the local network")
+
+        # Prefer IGD v2 if multiple gateways respond, else take the first.
+        responses_list = sorted(responses, key=lambda r: r.get("ST", ""), reverse=True)
+        location = responses_list[0]["LOCATION"]
+
+        factory = UpnpFactory(AiohttpRequester())
+        device = await factory.async_create_device(location)
+        igd = IgdDevice(device, event_handler=None)
+
+        gateway_ip = urlparse(location).hostname
+        lan_ip = _local_ip_for(gateway_ip)
+        ext_ip = await igd.async_get_external_ip_address()
+        return UPnP(igd, lan_ip, gateway_ip, ext_ip)
 
     def map_port(self, lan_addr, description="UPnP", protocol="TCP"):
         return PortMapping(self, lan_addr, description, protocol)
 
 
 class PortMapping:
+    # Some routers reject mappings whose external port already exists.
+    # Retry with a fresh random port on collision.
+    _RETRIES = 5
+
     def __init__(self, upnp, lan_addr, description, protocol):
         self.upnp = upnp
         self.lan_addr = lan_addr
@@ -42,21 +76,41 @@ class PortMapping:
         )
 
     async def __aenter__(self):
-        ext_port = await self.upnp.upnp.get_next_mapping(
-            port=randrange(1024, 65536 - 1024),  # Pick a random external port in the ephemeral range, and far from the maximum
-            protocol=self.protocol,
-            description=self.description,
-            internal_port=self.lan_addr[1],
-        )
-        self.ext_addr = (self.upnp.ext_ip, ext_port)
-        logger.info(f"Created external port mapping: {hostport(self.ext_addr)} -> {hostport(self.lan_addr)}")
-
-        return self
+        internal_client = IPv4Address(self.lan_addr[0])
+        last_err = None
+        for _ in range(self._RETRIES):
+            # Pick a random external port in the ephemeral range, away from the limits.
+            ext_port = randrange(1024, 65536 - 1024)
+            try:
+                await self.upnp.igd.async_add_port_mapping(
+                    remote_host=IPv4Address("0.0.0.0"),
+                    external_port=ext_port,
+                    protocol=self.protocol,
+                    internal_port=self.lan_addr[1],
+                    internal_client=internal_client,
+                    enabled=True,
+                    description=self.description,
+                    lease_duration=timedelta(0),
+                )
+            except UpnpError as e:
+                last_err = e
+                continue
+            self.ext_addr = (self.upnp.ext_ip, ext_port)
+            logger.info(f"Created external port mapping: {hostport(self.ext_addr)} -> {hostport(self.lan_addr)}")
+            return self
+        raise RuntimeError(f"Failed to create UPnP port mapping after {self._RETRIES} retries") from last_err
 
     async def __aexit__(self, exc_type, exc, tb):
         if not self.ext_addr:
             return
-        await self.upnp.upnp.delete_port_mapping(self.ext_addr[1], self.protocol)
+        try:
+            await self.upnp.igd.async_delete_port_mapping(
+                remote_host=IPv4Address("0.0.0.0"),
+                external_port=self.ext_addr[1],
+                protocol=self.protocol,
+            )
+        except UpnpError as e:
+            logger.warning(f"Failed to remove port mapping {hostport(self.ext_addr)}: {e}")
 
 
 # Quick test: python3 -m adbproxy.upnp
@@ -67,7 +121,8 @@ if __name__ == "__main__":
     logging.basicConfig()
 
     async def main():
-        async with (await UPnP.get()).map_port(("192.168.56.10", 1234)) as portmap:
+        upnp = await UPnP.get()
+        async with upnp.map_port((upnp.lan_ip, 1234)) as portmap:
             print(portmap)
             time.sleep(1)
 

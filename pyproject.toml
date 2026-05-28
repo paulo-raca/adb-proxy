@@ -18,7 +18,7 @@ devicefarm = [
     "botocore[crt]",
 ]
 upnp = [
-    "aioupnp @ git+https://github.com/paulo-raca/aioupnp.git@python3.10",
+    "async-upnp-client>=0.40",
 ]
 
 [project.scripts]
