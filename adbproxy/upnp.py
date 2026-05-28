@@ -18,17 +18,17 @@ logger = logging.getLogger("UPnP")
 logger.setLevel(logging.INFO)
 
 
-def _local_ip_for(gateway_ip: str) -> IPv4Address:
+def _local_ip_for(gateway_ip: IPv4Address) -> IPv4Address:
     # Discover which local interface routes to the gateway.
     # UDP-connect is local-only (no packet leaves the host) and the kernel
     # picks the source IP it would use to reach the gateway.
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.connect((gateway_ip, 1))
+        s.connect((str(gateway_ip), 1))
         return IPv4Address(s.getsockname()[0])
 
 
 class UPnP:
-    def __init__(self, igd: IgdDevice, lan_ip: IPv4Address, gateway_ip: str, ext_ip: str) -> None:
+    def __init__(self, igd: IgdDevice, lan_ip: IPv4Address, gateway_ip: IPv4Address, ext_ip: str) -> None:
         self.igd = igd
         self.lan_ip = lan_ip
         self.gateway_ip = gateway_ip
@@ -49,9 +49,10 @@ class UPnP:
         device = await factory.async_create_device(location)
         igd = IgdDevice(device, event_handler=None)
 
-        gateway_ip = urlparse(location).hostname
-        if gateway_ip is None:
+        gateway_hostname = urlparse(location).hostname
+        if gateway_hostname is None:
             raise RuntimeError(f"UPnP gateway LOCATION has no hostname: {location!r}")
+        gateway_ip = IPv4Address(gateway_hostname)
         lan_ip = _local_ip_for(gateway_ip)
         ext_ip = await igd.async_get_external_ip_address()
         if ext_ip is None:
