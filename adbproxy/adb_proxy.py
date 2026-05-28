@@ -27,7 +27,7 @@ from ipaddress import IPv4Address
 
 import asyncssh
 
-from .endpoint import Endpoint
+from .endpoint import Endpoint, spawn
 from .util import hostport, ssh_uri
 
 
@@ -623,13 +623,72 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
             logger.info(f"Incoming connection to {dest_host}:{dest_port}")
             return True
 
+    async def shell_factory(process: asyncssh.SSHServerProcess) -> None:
+        """Handle a session/shell request — spawn a PTY-backed shell and bridge it to the SSH channel.
+
+        We bridge stdin/stdout manually instead of using process.redirect because PTYs have no
+        half-close: forwarding an EOF on stdin to the PTY master would close the whole fd and
+        kill the subprocess.
+        """
+        pty = bool(process.get_terminal_type())
+        logger.info(f"hostshell session: command={process.command!r}, pty={pty}")
+        try:
+            reader, writer, exitcode = await spawn(
+                process.command,
+                pty=pty,
+                env={**os.environ, **(process.env or {})},
+            )
+        except Exception as e:
+            logger.warning(f"shell spawn failed: {e}")
+            process.exit(1)
+            return
+
+        async def stdin_pump() -> None:
+            # Forwards SSH stdin → PTY writer. When SSH stdin EOFs (the client closed
+            # its write side) we deliberately do NOT close the PTY writer — that would
+            # kill bash immediately. sshd treats PTY sessions the same way: bash stays
+            # alive until it exits on its own or the SSH session is torn down.
+            try:
+                while True:
+                    data = await process.stdin.read(4096)
+                    if not data:
+                        break
+                    writer.write(data)
+                    await writer.drain()
+            except Exception as e:
+                logger.warning(f"hostshell stdin pump exception: {type(e).__name__}: {e}")
+
+        async def stdout_pump() -> None:
+            try:
+                while True:
+                    data = await reader.read(4096)
+                    if not data:
+                        break
+                    process.stdout.write(data)
+                    await process.stdout.drain()
+            except Exception as e:
+                logger.warning(f"hostshell stdout pump exception: {type(e).__name__}: {e}")
+            finally:
+                process.stdout.close()
+
+        _stdin_task = asyncio.create_task(stdin_pump())
+        _stdout_task = asyncio.create_task(stdout_pump())
+
+        rc = await exitcode
+        writer.close()
+        logger.info(f"hostshell session exited with code {rc}")
+        process.exit(rc)
+
     server_host_key = asyncssh.generate_private_key("ecdsa-sha2-nistp256")
     ssh_conn = await asyncssh.connect_reverse(
         server_factory=MySSHServer,
+        process_factory=shell_factory,
         tunnel=ssh_client,
         host=server_address["host"],
         port=server_address["port"],
         server_host_keys=[server_host_key],
+        line_editor=False,
+        encoding=None,
     )
 
     async with ssh_conn:
