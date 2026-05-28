@@ -29,7 +29,7 @@ import asyncssh
 
 from .adb_channel import device_path, list_adb_devices, open_stream, read_stream
 from .endpoint import Endpoint
-from .util import check_call, hostport, ssh_uri
+from .util import hostport, ssh_uri
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -432,7 +432,9 @@ async def connect(
         async def wait_for(serial):
             env = dict(os.environ)
             env["ANDROID_SERIAL"] = serial
-            await check_call(*connect_cmd, env=env)
+            proc = await asyncio.create_subprocess_exec(*connect_cmd, env=env)
+            if await proc.wait() != 0:
+                raise Exception(f"{connect_cmd[0]} exited non-zero")
 
     else:
         wait_for = None
