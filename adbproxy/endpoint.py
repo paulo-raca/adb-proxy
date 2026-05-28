@@ -1,13 +1,17 @@
 import asyncio
+import os
 import socket
 from abc import ABC, abstractmethod
+from typing import Any, Callable
 
 import asyncssh
+
+from .util import SockAddr
 
 
 class Endpoint(ABC):
     @staticmethod
-    async def of(adb_sockaddr, ssh_client=None):
+    async def of(adb_sockaddr: SockAddr, ssh_client: Any = None) -> "Endpoint":
         if ssh_client:
             try:
                 hostname = (await ssh_client.run("hostname", stdin=asyncssh.DEVNULL, stderr=asyncssh.DEVNULL)).stdout.strip() or None
@@ -20,47 +24,47 @@ class Endpoint(ABC):
             hostname = hostname or ssh_client._host or addr
             return SshEndpoint(hostname, ssh_client, addr, adb_sockaddr)
         else:
-            _, writer = await asyncio.open_connection(adb_sockaddr[0], adb_sockaddr[1])
+            _, writer = await asyncio.open_connection(str(adb_sockaddr.host), adb_sockaddr.port)
             local_addr = writer.transport.get_extra_info("sockname")[0]
             writer.close()
 
             return LocalEndpoint(socket.gethostname(), local_addr, adb_sockaddr)
 
-    def __init__(self, local_hostname, local_addr, adb_sockaddr):
+    def __init__(self, local_hostname: str, local_addr: str, adb_sockaddr: SockAddr) -> None:
         self.local_hostname = local_hostname
         self.local_addr = local_addr
         self.adb_sockaddr = adb_sockaddr
 
-    async def connect_to_adb(self):
+    async def connect_to_adb(self) -> tuple[Any, Any]:
         return await self.connect(self.adb_sockaddr)
 
     @abstractmethod
-    async def connect(self, sockaddr):
+    async def connect(self, sockaddr: SockAddr) -> tuple[Any, Any]:
         pass
 
     @abstractmethod
-    async def listen(self, on_connected):
+    async def listen(self, on_connected: Callable[..., Any]) -> tuple[Any, SockAddr]:
         pass
 
     @abstractmethod
-    async def shell(self, command, pty=True):
+    async def shell(self, command: str | None, pty: bool = True) -> tuple[Any, Any]:
         pass
 
 
 class SshEndpoint(Endpoint):
-    def __init__(self, local_hostname, ssh_client, local_addr, adb_sockaddr):
+    def __init__(self, local_hostname: str, ssh_client: Any, local_addr: str, adb_sockaddr: SockAddr) -> None:
         Endpoint.__init__(self, local_hostname, local_addr, adb_sockaddr)
         self.ssh_client = ssh_client
 
-    async def connect(self, sockaddr):
-        return await self.ssh_client.open_connection(remote_host=sockaddr[0], remote_port=sockaddr[1])
+    async def connect(self, sockaddr: SockAddr) -> tuple[Any, Any]:
+        return await self.ssh_client.open_connection(remote_host=sockaddr.host, remote_port=sockaddr.port)
 
-    async def listen(self, on_connected):
+    async def listen(self, on_connected: Callable[..., Any]) -> tuple[Any, SockAddr]:
         server = await self.ssh_client.start_server(lambda *args: on_connected, listen_host=self.local_addr, listen_port=0)
         print("Listening on", self.local_addr, server.get_port())
-        return server, (self.local_addr, server.get_port())
+        return server, SockAddr(self.local_addr, server.get_port())
 
-    async def shell(self, command, pty=True):
+    async def shell(self, command: str | None, pty: bool = True) -> tuple[Any, Any]:
         proc = await self.ssh_client.create_process(
             command,
             stdin=asyncssh.PIPE,
@@ -73,20 +77,21 @@ class SshEndpoint(Endpoint):
 
 
 class LocalEndpoint(Endpoint):
-    def __init__(self, local_hostname, local_addr, adb_sockaddr):
+    def __init__(self, local_hostname: str, local_addr: str, adb_sockaddr: SockAddr) -> None:
         Endpoint.__init__(self, local_hostname, local_addr, adb_sockaddr)
 
-    async def connect(self, sockaddr):
-        return await asyncio.open_connection(sockaddr[0], sockaddr[1])
+    async def connect(self, sockaddr: SockAddr) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+        return await asyncio.open_connection(str(sockaddr.host), sockaddr.port)
 
-    async def listen(self, on_connected):
+    async def listen(self, on_connected: Callable[..., Any]) -> tuple[asyncio.Server, SockAddr]:
         server = await asyncio.start_server(on_connected, self.local_addr, 0)
-        return server, server.sockets[0].getsockname()
+        host, port, *_ = server.sockets[0].getsockname()
+        return server, SockAddr(host, port)
 
-    async def shell(self, command, pty=True):
+    async def shell(self, command: str | None, pty: bool = True) -> tuple[Any, Any]:
         # TODO: Support PTY
         proc = await asyncio.create_subprocess_shell(
-            command,
+            command or os.environ.get("SHELL", "/bin/sh"),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,

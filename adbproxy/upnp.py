@@ -12,7 +12,7 @@ from async_upnp_client.client_factory import UpnpFactory
 from async_upnp_client.exceptions import UpnpError
 from async_upnp_client.profiles.igd import IgdDevice
 
-from .util import hostport, local_ip_for
+from .util import SockAddr, hostport, local_ip_for
 
 
 logger = logging.getLogger("UPnP")
@@ -110,7 +110,7 @@ class UPnP:
             description=description,
             protocol=protocol,
         )
-        logger.info(f"Created external port mapping: {hostport(active.wan_addr)} -> {hostport(active.lan_addr)}")
+        logger.info(f"Created external port mapping: {hostport(SockAddr(*active.wan_addr))} -> {hostport(SockAddr(*active.lan_addr))}")
         try:
             yield active
         finally:
@@ -121,7 +121,7 @@ class UPnP:
                     protocol=active.protocol,
                 )
             except UpnpError as e:
-                logger.warning(f"Failed to remove port mapping {hostport(active.wan_addr)}: {e}")
+                logger.warning(f"Failed to remove port mapping {hostport(SockAddr(*active.wan_addr))}: {e}")
 
 
 # Quick test: python3 -m adbproxy.upnp

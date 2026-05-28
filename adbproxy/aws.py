@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 from importlib.resources import files
+from typing import Any
 
 import aiobotocore.session
 import aiohttp
@@ -17,7 +18,7 @@ logger = logging.getLogger("DeviceFarm")
 logger.setLevel(logging.INFO)
 
 
-def arn_to_url(arn):
+def arn_to_url(arn: str) -> str:
     """
     Maps an ARN to its URL on AWS console
 
@@ -83,7 +84,7 @@ def arn_to_url(arn):
     return ret
 
 
-async def find_project(client, project_name):
+async def find_project(client: Any, project_name: str) -> str:
     async for page in client.get_paginator("list_projects").paginate():
         for project in page["projects"]:
             if project["name"] == project_name:
@@ -92,7 +93,7 @@ async def find_project(client, project_name):
     raise KeyError(f"Project not found: {project_name}")
 
 
-async def find_devicepool(client, project_arn, device_pool):
+async def find_devicepool(client: Any, project_arn: str, device_pool: str) -> str:
     async for page in client.get_paginator("list_device_pools").paginate(arn=project_arn):
         for devicepool in page["devicePools"]:
             if devicepool["name"] == device_pool:
@@ -101,13 +102,13 @@ async def find_devicepool(client, project_arn, device_pool):
     raise KeyError(f"Devicepool not found: {device_pool}")
 
 
-async def find_devices(client, project_arn, device_ids):
+async def find_devices(client: Any, project_arn: str, device_ids: list[str]) -> list[dict[str, Any]] | None:
     unmatched_ids = set(device_ids)
 
-    matched_device_names = []
-    matched_device_arns = []
-    matched_instance_names = []
-    matched_instance_arns = []
+    matched_device_names: list[str] = []
+    matched_device_arns: list[str] = []
+    matched_instance_names: list[str] = []
+    matched_instance_arns: list[str] = []
     async for page in client.get_paginator("list_devices").paginate(arn=project_arn):
         for device in page["devices"]:
             device_name = device["name"]
@@ -143,9 +144,18 @@ async def find_devices(client, project_arn, device_ids):
     elif matched_device_names:
         logger.info(f"Using devices: {', '.join(matched_device_names)}")
         return [{"attribute": "ARN", "operator": "IN", "values": matched_device_arns}]
+    return None
 
 
-async def upload(client, http_session, project_arn, uploads_to_delete, name, type, data):
+async def upload(
+    client: Any,
+    http_session: aiohttp.ClientSession,
+    project_arn: str,
+    uploads_to_delete: list[tuple[str, str, str]],
+    name: str,
+    type: str,
+    data: bytes,
+) -> str:
     # Create the upload placeholder
     upload_info = (await client.create_upload(projectArn=project_arn, name=name, type=type))["upload"]
     uploads_to_delete.append((name, type, upload_info["arn"]))
@@ -166,7 +176,7 @@ async def upload(client, http_session, project_arn, uploads_to_delete, name, typ
             await asyncio.sleep(1)
 
 
-async def run(project_name, device_ids, device_pool, ssh_path):
+async def run(project_name: str, device_ids: list[str], device_pool: str, ssh_path: dict[str, Any]) -> None:
     async with (
         aiobotocore.session.get_session().create_client("devicefarm", region_name="us-west-2") as client,
         aiohttp.ClientSession() as http_session,
@@ -174,7 +184,7 @@ async def run(project_name, device_ids, device_pool, ssh_path):
         project_arn = await find_project(client, project_name)
 
         if device_ids:
-            device_filter = {
+            device_filter: dict[str, Any] = {
                 "deviceSelectionConfiguration": {
                     "filters": await find_devices(client, project_arn, device_ids),
                     "maxDevices": 999,
@@ -183,7 +193,7 @@ async def run(project_name, device_ids, device_pool, ssh_path):
         else:
             device_filter = {"devicePoolArn": await find_devicepool(client, project_arn, device_pool)}
 
-        uploads_to_delete = []
+        uploads_to_delete: list[tuple[str, str, str]] = []
         try:
             dummy_apk = (files("adbproxy") / "dummy.apk").read_bytes()
 
@@ -235,7 +245,7 @@ async def run(project_name, device_ids, device_pool, ssh_path):
                 ),
             )
 
-            run_config = {
+            run_config: dict[str, Any] = {
                 "name": "ADB Proxy",
                 "projectArn": project_arn,
                 "appArn": main_apk_arn,
@@ -269,11 +279,11 @@ async def run(project_name, device_ids, device_pool, ssh_path):
                 logger.info(f"Deleted uploaded: {upload_name} ({upload_type})")
 
 
-async def devicefarm(project_name, device_ids, device_pool, *args, **kwargs):
+async def devicefarm(project_name: str, device_ids: list[str], device_pool: str, **kwargs: Any) -> Any:
     # For security, uses a random password to secure the connection
     kwargs["listen_address"].setdefault("password", random_str(16))
 
-    async def listen_until(socket_addr, ssh_client):
+    async def listen_until(socket_addr: dict[str, Any], ssh_client: Any) -> None:
         await run(project_name, device_ids, device_pool, socket_addr)
 
-    return await listen_reverse(*args, **kwargs, wait_for=listen_until)
+    return await listen_reverse(**kwargs, wait_for=listen_until)

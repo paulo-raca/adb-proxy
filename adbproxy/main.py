@@ -4,10 +4,10 @@ import asyncio
 import argcomplete
 
 from .adb_proxy import connect, connect_reverse, listen_reverse, use_tunnels
-from .util import sock_addr, ssh_addr
+from .util import SockAddr, sock_addr, ssh_addr
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Creates ADB Proxy connections")
 
     ssh_jump_parser = argparse.ArgumentParser(add_help=False)
@@ -26,7 +26,7 @@ def main():
         "--device-adb-server",
         dest="device_adb_addr",
         type=sock_addr,
-        default=("localhost", 5037),
+        default=SockAddr("localhost", 5037),
         help="Socket address of ADB server attached to the device",
     )
     deviceinfo_parser.add_argument(
@@ -50,7 +50,7 @@ def main():
         "--host-adb-server",
         dest="host_adb_addr",
         type=sock_addr,
-        default=("localhost", 5037),
+        default=SockAddr("localhost", 5037),
         help="Socket address of ADB server away from the device",
     )
 

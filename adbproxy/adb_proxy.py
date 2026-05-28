@@ -24,12 +24,13 @@ import socket
 import struct
 import traceback
 from ipaddress import IPv4Address
+from typing import Any, Callable, Coroutine
 
 import asyncssh
 
 from .adb_channel import device_path, list_adb_devices, open_stream, read_stream
 from .endpoint import Endpoint
-from .util import check_call, hostport, ssh_uri
+from .util import SockAddr, check_call, hostport, ssh_uri
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -44,7 +45,15 @@ class AdbProxyChannel:
     Channels are used to execute commands, upload files, etc
     """
 
-    def __init__(self, adb_device, name, local_id, remote_id, reader, writer):
+    def __init__(
+        self,
+        adb_device: "AdbProxy",
+        name: str,
+        local_id: int,
+        remote_id: int,
+        reader: Any,
+        writer: Any,
+    ) -> None:
         self.adb_device = adb_device
         self.name = name
         self.local_id = local_id
@@ -59,7 +68,7 @@ class AdbProxyChannel:
 
         self.ready_to_send = asyncio.Semaphore(0)
 
-    async def write(self, data):
+    async def write(self, data: bytes) -> None:
         """Sends data from ADB Server to the device"""
         try:
             self.writer.write(data)
@@ -72,11 +81,11 @@ class AdbProxyChannel:
         except Exception:
             await self.close()
 
-    async def ready(self):
+    async def ready(self) -> None:
         """Ready to send data from device to the ADB server"""
         self.ready_to_send.release()
 
-    async def sink(self):
+    async def sink(self) -> None:
         """Consumes data from this stream and sends back to ADB"""
         try:
             while True:
@@ -100,7 +109,7 @@ class AdbProxyChannel:
         finally:
             await self.close()
 
-    async def close(self, send_close_cmd=True, quiet=False):
+    async def close(self, send_close_cmd: bool = True, quiet: bool = False) -> None:
         # Stream closed by ADB
         if self.local_id in self.adb_device.streams:
             del self.adb_device.streams[self.local_id]
@@ -122,14 +131,14 @@ class AdbProxy:
 
     def __init__(
         self,
-        reader,
-        writer,
-        local_endpoint,
-        device_endpoint,
-        device_id,
-        device_name,
-        reverse_connection_supported=True,
-    ):
+        reader: Any,
+        writer: Any,
+        local_endpoint: Endpoint,
+        device_endpoint: Endpoint,
+        device_id: str,
+        device_name: str,
+        reverse_connection_supported: bool = True,
+    ) -> None:
         self.local_endpoint = local_endpoint
         self.device_endpoint = device_endpoint
         self.device_id = device_id
@@ -140,29 +149,29 @@ class AdbProxy:
 
         self.reader = reader
         self.writer = writer
-        self.streams = {}
-        self.reverse_listeners = {}
+        self.streams: dict[int, AdbProxyChannel] = {}
+        self.reverse_listeners: dict[str, Any] = {}
         self.next_local_id = 1
 
-    async def open_stream(self, *name):
+    async def open_stream(self, *name: str) -> tuple[Any, Any]:
         return await open_stream(self.device_endpoint, device_path(self.device_id), *name)
 
-    async def read_stream(self, *name):
+    async def read_stream(self, *name: str) -> bytes:
         return await read_stream(self.device_endpoint, device_path(self.device_id), *name)
 
-    async def send_cmd(self, cmd, arg0, arg1, data=b""):
+    async def send_cmd(self, cmd: bytes, arg0: int, arg1: int, data: bytes | str = b"") -> None:
         """Send a command to the local ADB Server"""
         if isinstance(data, str):
             data = data.encode("utf-8")
 
         # logger.debug(f"Send {cmd}, arg0={arg0}, arg1={arg1}, data={data}")
-        (cmd,) = struct.unpack("<I", cmd)
-        header = struct.pack("<IIIIII", cmd, arg0, arg1, len(data), binascii.crc32(data), cmd ^ 0xFFFFFFFF)
+        (cmd_int,) = struct.unpack("<I", cmd)
+        header = struct.pack("<IIIIII", cmd_int, arg0, arg1, len(data), binascii.crc32(data), cmd_int ^ 0xFFFFFFFF)
         self.writer.write(header)
         self.writer.write(data)
         await self.writer.drain()
 
-    async def recv_cmd(self):
+    async def recv_cmd(self) -> tuple[bytes, int, int, bytes]:
         """Receives a command from the local ADB Server"""
         header_blob = await self.reader.readexactly(6 * 4)
         cmd, arg0, arg1, data_length, crc32, magic = struct.unpack("<IIIIII", header_blob)
@@ -175,7 +184,7 @@ class AdbProxy:
         # logger.debug(f"Recv {header_blob[:4]}, arg0={arg0}, arg1={arg1}, data={data}")
         return header_blob[:4], arg0, arg1, data
 
-    async def reverse_create(self, remote, local, local_id, remote_id):
+    async def reverse_create(self, remote: str, local: str, local_id: int, remote_id: int) -> None:
         async def on_connected(r, w):
             logger.info(f"Received a reverse connection: {tunnel_desc}")
 
@@ -214,7 +223,7 @@ class AdbProxy:
         await self.send_cmd(b"WRTE", local_id, remote_id, ret)
         await self.send_cmd(b"CLSE", local_id, remote_id)
 
-    async def reverse_remove(self, remote, local_id, remote_id):
+    async def reverse_remove(self, remote: str, local_id: int, remote_id: int) -> None:
         cmd = f"reverse:killforward:{remote}"
         ret = await self.read_stream(cmd)
 
@@ -228,7 +237,7 @@ class AdbProxy:
         await self.send_cmd(b"WRTE", local_id, remote_id, ret)
         await self.send_cmd(b"CLSE", local_id, remote_id)
 
-    async def reverse_remove_all(self, local_id, remote_id):
+    async def reverse_remove_all(self, local_id: int, remote_id: int) -> None:
         for remote, old_listener in self.reverse_listeners.items():
             logger.info(f"Closing reverse tunnel to {remote}")
             old_listener.close()
@@ -238,7 +247,7 @@ class AdbProxy:
         await self.send_cmd(b"WRTE", local_id, remote_id, b"OKAY")
         await self.send_cmd(b"CLSE", local_id, remote_id)
 
-    async def open_channel(self, name, local_id, remote_id):
+    async def open_channel(self, name: str, local_id: int, remote_id: int) -> None:
         """Open a channel to the device and register it with the specified ID"""
         try:
             # Special case: "reverse" -- We need to open a server socket on the device remote and use it as a proxy
@@ -280,7 +289,7 @@ class AdbProxy:
             logger.warning(f"{local_id}[{name}] failed to open -- {e}")
             await self.send_cmd(b"CLSE", 0, remote_id)  # Failed to open stream
 
-    async def go(self):
+    async def go(self) -> None:
         """Main method, executes the proxying between local server and remote device"""
         try:
             logger.info(f"Connected to device {self.device_id} @ {self.device_endpoint.local_hostname} ({self.device_name})")
@@ -354,7 +363,13 @@ class AdbProxy:
             self.writer.close()
 
     @staticmethod
-    async def attach_raw(local_endpoint, remote_endpoint, device_id, reverse_connection_supported, wait_for=None):
+    async def attach_raw(
+        local_endpoint: Endpoint,
+        remote_endpoint: Endpoint,
+        device_id: str | None,
+        reverse_connection_supported: bool,
+        wait_for: Callable[[str], Coroutine[Any, Any, Any]] | None = None,
+    ) -> None:
         devices = await list_adb_devices(remote_endpoint)
         if device_id is None:
             if len(devices) == 1:
@@ -416,13 +431,13 @@ class AdbProxy:
 
 
 async def connect(
-    device_id,
-    adb_reverse_supported=True,
-    connect_cmd=None,
-    host_adb_addr=("localhost", 5037),
-    device_adb_addr=("localhost", 5037),
-    ssh_client=None,
-):
+    device_id: str | None,
+    adb_reverse_supported: bool = True,
+    connect_cmd: list[str] | None = None,
+    host_adb_addr: SockAddr = SockAddr("localhost", 5037),
+    device_adb_addr: SockAddr = SockAddr("localhost", 5037),
+    ssh_client: Any = None,
+) -> None:
     logger.info("Connecting...")
     local_endpoint = await Endpoint.of(host_adb_addr)
     remote_endpoint = await Endpoint.of(device_adb_addr, ssh_client)
@@ -440,7 +455,13 @@ async def connect(
     return await AdbProxy.attach_raw(local_endpoint, remote_endpoint, device_id, adb_reverse_supported, wait_for=wait_for)
 
 
-async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=False, **kwargs):
+async def listen_reverse(
+    listen_address: dict[str, Any],
+    ssh_client: Any = None,
+    wait_for: Callable[..., Coroutine[Any, Any, Any]] | None = None,
+    upnp: bool = False,
+    **kwargs: Any,
+) -> None:
     if upnp:
         if ssh_client:
             raise Exception("Use either UPnP or SSH tunnels")
@@ -565,7 +586,7 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
             await asyncio.tasks.gather(*connections)
 
 
-async def connect_reverse(server_address, ssh_client=None, **kwargs):
+async def connect_reverse(server_address: dict[str, Any], ssh_client: Any = None, **kwargs: Any) -> None:
     server_address.setdefault("username", "adb-proxy")
     server_address.setdefault("host", "localhost")
     server_address.setdefault("port", 22)
@@ -620,7 +641,13 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
         logger.info("Disconnected")
 
 
-async def use_tunnels(*, func, ssh_tunnels=(), ssh_client=None, **kwargs):
+async def use_tunnels(
+    *,
+    func: Callable[..., Coroutine[Any, Any, Any]],
+    ssh_tunnels: tuple[dict[str, Any], ...] = (),
+    ssh_client: Any = None,
+    **kwargs: Any,
+) -> Any:
     if ssh_tunnels:
         async with asyncssh.connect(tunnel=ssh_client, **ssh_tunnels[0]) as ssh_client:
             logger.info(f"Jumping through SSH proxy: {ssh_uri(ssh_tunnels[0])}")
