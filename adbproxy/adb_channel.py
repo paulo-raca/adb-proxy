@@ -1,8 +1,11 @@
-def device_path(device_id):
+from .endpoint import Endpoint, StreamReader, StreamWriter
+
+
+def device_path(device_id: str) -> str:
     return f"host:transport:{device_id}"
 
 
-async def open_stream(endpoint, *path):
+async def open_stream(endpoint: Endpoint, *path: str) -> tuple[StreamReader, StreamWriter]:
     """Open a stream to the device"""
     reader, writer = await endpoint.connect_to_adb()
 
@@ -29,16 +32,16 @@ async def open_stream(endpoint, *path):
         raise
 
 
-async def read_stream(*args, **kwargs):
+async def read_stream(endpoint: Endpoint, *path: str) -> bytes:
     """Open a stream to the device, read its contents and close"""
-    reader, writer = await open_stream(*args, **kwargs)
+    reader, writer = await open_stream(endpoint, *path)
     try:
         return await reader.read()
     finally:
         writer.close()
 
 
-async def list_adb_devices(endpoint):
+async def list_adb_devices(endpoint: Endpoint) -> list[str]:
     lines = (await read_stream(endpoint, "host:devices"))[4:].decode("utf-8").splitlines()
     ret = []
     for line in lines:
