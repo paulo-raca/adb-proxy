@@ -20,13 +20,13 @@ logger.setLevel(logging.INFO)
 
 # Some routers reject mappings whose external port already exists.
 # Retry with a fresh random port on collision.
-_PORT_MAPPING_RETRIES = 5
+_PORT_MAPPING_RETRIES = 10
 
 
 @dataclass(frozen=True)
-class ActivePortMapping:
+class PortMapping:
     lan_addr: tuple[IPv4Address, int]
-    ext_addr: tuple[IPv4Address, int]
+    wan_addr: tuple[IPv4Address, int]
     description: str
     protocol: str
 
@@ -79,7 +79,7 @@ class UPnP:
         lan_addr: tuple[IPv4Address, int],
         description: str = "UPnP",
         protocol: str = "TCP",
-    ) -> AsyncIterator[ActivePortMapping]:
+    ) -> AsyncIterator[PortMapping]:
         last_err: UpnpError | None = None
         ext_port: int | None = None
         for _ in range(_PORT_MAPPING_RETRIES):
@@ -104,24 +104,24 @@ class UPnP:
         if ext_port is None:
             raise RuntimeError(f"Failed to create UPnP port mapping after {_PORT_MAPPING_RETRIES} retries") from last_err
 
-        active = ActivePortMapping(
+        active = PortMapping(
             lan_addr=lan_addr,
-            ext_addr=(self.ext_ip, ext_port),
+            wan_addr=(self.ext_ip, ext_port),
             description=description,
             protocol=protocol,
         )
-        logger.info(f"Created external port mapping: {hostport(active.ext_addr)} -> {hostport(active.lan_addr)}")
+        logger.info(f"Created external port mapping: {hostport(active.wan_addr)} -> {hostport(active.lan_addr)}")
         try:
             yield active
         finally:
             try:
                 await self.igd.async_delete_port_mapping(
                     remote_host=IPv4Address("0.0.0.0"),
-                    external_port=active.ext_addr[1],
+                    external_port=active.wan_addr[1],
                     protocol=active.protocol,
                 )
             except UpnpError as e:
-                logger.warning(f"Failed to remove port mapping {hostport(active.ext_addr)}: {e}")
+                logger.warning(f"Failed to remove port mapping {hostport(active.wan_addr)}: {e}")
 
 
 # Quick test: python3 -m adbproxy.upnp

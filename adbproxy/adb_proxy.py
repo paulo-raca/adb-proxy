@@ -551,8 +551,8 @@ async def listen_reverse(listen_address, ssh_client=None, wait_for=None, upnp=Fa
 
             if upnp_client:
                 async with upnp_client.map_port((IPv4Address(socket_addr["host"]), socket_addr["port"]), "ADB Proxy") as port_map:
-                    socket_addr["host"] = str(port_map.ext_addr[0])
-                    socket_addr["port"] = port_map.ext_addr[1]
+                    socket_addr["host"] = str(port_map.wan_addr[0])
+                    socket_addr["port"] = port_map.wan_addr[1]
                     await wait_until_complete()
             else:
                 await wait_until_complete()
