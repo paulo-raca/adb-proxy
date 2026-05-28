@@ -1,36 +1,31 @@
 repos:
-  - repo: https://github.com/pycqa/autoflake
-    rev: 'v2.1.1'
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.15
     hooks:
-    - id: autoflake
-      args: ['--in-place', '--remove-all-unused-imports', '--remove-unused-variables', '--ignore-init-module-imports']
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
 
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.11.16
     hooks:
-      - id: isort
+      - id: uv-lock
 
-  - repo: https://github.com/ambv/black
-    rev: 23.3.0
+  - repo: local
     hooks:
-    - id: black
-      language_version: python3.7
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v1.2.3
-    hooks:
-    - id: flake8
-
-  - repo: https://github.com/python-poetry/poetry
-    rev: 1.5.0
-    hooks:
-      - id: poetry-check
-      - id: poetry-lock
+      - id: ty
+        name: ty
+        entry: uv run --all-extras ty check
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-      - id: check-merge-conflict
       - id: end-of-file-fixer
+      - id: check-merge-conflict
       - id: check-toml
+      - id: check-yaml

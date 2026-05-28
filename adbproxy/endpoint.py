@@ -76,8 +76,8 @@ class LocalEndpoint(Endpoint):
     def __init__(self, local_hostname, local_addr, adb_sockaddr):
         Endpoint.__init__(self, local_hostname, local_addr, adb_sockaddr)
 
-    async def connect(self, addr):
-        return await asyncio.open_connection(addr[0], addr[1])
+    async def connect(self, sockaddr):
+        return await asyncio.open_connection(sockaddr[0], sockaddr[1])
 
     async def listen(self, on_connected):
         server = await asyncio.start_server(on_connected, self.local_addr, 0)

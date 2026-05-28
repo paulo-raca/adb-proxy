@@ -73,9 +73,9 @@ user@othercomputer$ adbproxy connect-reverse -s device_serial gatewaycomputer:po
 #### UPnP Gateways
 
 > **Note**
-> 
+>
 > This section requires the installation of the `upnp` extras:
-> 
+>
 > ```pip install git+https://github.com/paulo-raca/adb-proxy.git[upnp]```
 
 If you are behind a NAT and your router has UPnP enabled, `--upnp` can be used to automatically setup port forwarding on your gateway from public internet
@@ -100,9 +100,9 @@ user@othercomputer$ adbproxy connect-reverse ngrok_host:ngrok_port  # listen-rev
 ### DeviceFarm
 
 > **Note**
-> 
+>
 > This section requires the installation of the `devicefarm` extras:
-> 
+>
 > ```pip install git+https://github.com/paulo-raca/adb-proxy.git[devicefarm]```
 
 [DeviceFarm](https://aws.amazon.com/pt/device-farm/) is an AWS service for automatic testing of Android and iOS apps.

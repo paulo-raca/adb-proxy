@@ -1,47 +1,56 @@
-[tool.poetry]
+[project]
 name = "adbproxy"
 version = "1.1.1"
 description = "Proxy to access android devices attached to a remote machine via ADB"
 readme = "README.md"
-authors = ["Paulo Costa"]
-packages = [
-    { include = "adbproxy" },
+authors = [{ name = "Paulo Costa" }]
+requires-python = ">=3.10"
+dependencies = [
+    "argcomplete>=3.1.1",
+    "asyncssh>=2.19.0",
+    "PyYAML>=6.0",
 ]
 
-[tool.poetry.scripts]
-adbproxy = 'adbproxy:main'
+[project.optional-dependencies]
+devicefarm = [
+    "aiobotocore>=2.5.0",
+    "aiohttp>=3.8",
+]
+upnp = [
+    "aioupnp @ git+https://github.com/paulo-raca/aioupnp.git@python3.10",
+]
 
-[tool.poetry.dependencies]
-python = "^3.7"
-argcomplete = "^3.1.1"
-asyncssh = "^2.19.0"
-PyYAML = "^6.0"
-aioupnp = {git = "https://github.com/paulo-raca/aioupnp.git", rev = "python3.10", optional=true}
-aiobotocore = {version="^2.5.0", optional=true}
+[project.scripts]
+adbproxy = "adbproxy:main"
 
-[tool.poetry.extras]
-devicefarm = ["aiobotocore"]
-upnp = ["aioupnp"]
-
-[tool.poetry.group.dev.dependencies]
-mypy = "^1.4.0"
-pre-commit = {version = "^3.3.3", python = "^3.8"}
+[dependency-groups]
+dev = [
+    "ruff>=0.15",
+    "ty>=0.0.40",
+    "pre-commit>=4",
+]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.black]
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["adbproxy"]
+
+[tool.ruff]
 line-length = 149
-target-version = ["py37"]
+target-version = "py310"
 
-[tool.isort]
-src_paths = ["adbproxy", "tests"]
-profile = "black"
-indent = 4
-combine_star = true
-combine_as_imports = true
-lines_after_imports = 2
-known_pytest = ["pytest"]
-known_first_party = ["adbproxy"]
-sections = ["FUTURE", "STDLIB", "PYTEST", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["adbproxy"]
+combine-as-imports = true
+lines-after-imports = 2
+
+[tool.ty.environment]
+python-version = "3.10"
