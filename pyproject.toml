@@ -33,6 +33,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 149
+target-version = ["py37"]
 
 [tool.isort]
 src_paths = ["adbproxy", "tests"]
