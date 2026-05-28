@@ -1,11 +1,11 @@
 import asyncio
 import logging
 import re
+from importlib.resources import files
 
 import aiobotocore.session
 import aiohttp
 import yaml
-from pkg_resources import resource_string
 
 from adbproxy.util import random_str
 
@@ -182,7 +182,7 @@ async def run(project_name, device_ids, device_pool, ssh_path):
 
         uploads_to_delete = []
         try:
-            dummy_apk = resource_string(__name__, "dummy.apk")
+            dummy_apk = (files("adbproxy") / "dummy.apk").read_bytes()
 
             test_spec = {
                 "version": 0.1,
