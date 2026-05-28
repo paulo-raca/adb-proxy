@@ -1,5 +1,4 @@
 import logging
-import socket
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -13,7 +12,7 @@ from async_upnp_client.client_factory import UpnpFactory
 from async_upnp_client.exceptions import UpnpError
 from async_upnp_client.profiles.igd import IgdDevice
 
-from .util import hostport
+from .util import hostport, local_ip_for
 
 
 logger = logging.getLogger("UPnP")
@@ -22,15 +21,6 @@ logger.setLevel(logging.INFO)
 # Some routers reject mappings whose external port already exists.
 # Retry with a fresh random port on collision.
 _PORT_MAPPING_RETRIES = 5
-
-
-def _local_ip_for(gateway_ip: IPv4Address) -> IPv4Address:
-    # Discover which local interface routes to the gateway.
-    # UDP-connect is local-only (no packet leaves the host) and the kernel
-    # picks the source IP it would use to reach the gateway.
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.connect((str(gateway_ip), 1))
-        return IPv4Address(s.getsockname()[0])
 
 
 @dataclass(frozen=True)
@@ -76,7 +66,7 @@ class UPnP:
         device = await factory.async_create_device(location)
         igd = IgdDevice(device, event_handler=None)
 
-        lan_ip = _local_ip_for(gateway_ip)
+        lan_ip = local_ip_for(gateway_ip)
         ext_ip_str = await igd.async_get_external_ip_address()
         if ext_ip_str is None:
             raise RuntimeError("UPnP gateway did not report an external IP address")
