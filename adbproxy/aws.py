@@ -167,7 +167,10 @@ async def upload(client, http_session, project_arn, uploads_to_delete, name, typ
 
 
 async def run(project_name, device_ids, device_pool, ssh_path):
-    async with aiobotocore.session.get_session().create_client("devicefarm") as client, aiohttp.ClientSession() as http_session:
+    async with (
+        aiobotocore.session.get_session().create_client("devicefarm", region_name="us-west-2") as client,
+        aiohttp.ClientSession() as http_session,
+    ):
         project_arn = await find_project(client, project_name)
 
         if device_ids:
@@ -186,20 +189,17 @@ async def run(project_name, device_ids, device_pool, ssh_path):
 
             test_spec = {
                 "version": 0.1,
+                "android_test_host": "amazon_linux_2",
                 "phases": {
                     "install": {
                         "commands": [
-                            # "wget -q http://cs-mobile-sample-apks-shared.s3-us-west-1.amazonaws.com/aws-tools/python3.6-prebuilt.tar.gz",
-                            # "tar -xf python3.6-prebuilt.tar.gz",  # Executable at "$PWD/python3.6-prebuilt/bin/python3"
-                            "virtualenv3 $(pwd)/env3",
-                            ". env3/bin/activate",
-                            "python -V",
-                            "python -m pip install git+https://github.com/paulo-raca/adb-proxy.git",
+                            "curl -LsSf https://astral.sh/uv/install.sh | sh",
                         ],
                     },
                     "test": {
                         "commands": [
-                            f'python -m adbproxy connect-reverse --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path, hide_pwd=False)}"'
+                            "uvx --from git+https://github.com/paulo-raca/adb-proxy.git adbproxy connect-reverse"
+                            f' --no-adb-reverse -s $DEVICEFARM_DEVICE_UDID "{ssh_uri(ssh_path, hide_pwd=False)}"',
                         ]
                     },
                 },

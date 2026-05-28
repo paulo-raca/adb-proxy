@@ -118,19 +118,19 @@ To use it, ensure you have:
 The connectivity options are the same as those for reverse connections
 
 ```bash
-user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPool" my_ip:port  # Assuming my_ip is available externally
+user@mycomputer$ adbproxy devicefarm --project="MyProject" --device-pool="MyPool" my_ip:port  # Assuming my_ip is available externally
 ```
 
 ```bash
-user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPool" gateway_ip:port -J user@gatewaycomputer  # Assuming gateway_ip is available externally
+user@mycomputer$ adbproxy devicefarm --project="MyProject" --device-pool="MyPool" gateway_ip:port -J user@gatewaycomputer  # Assuming gateway_ip is available externally
 ```
 
 ```bash
-user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPool" --upnp  # Will automatically set port forwarding from a public ip
+user@mycomputer$ adbproxy devicefarm --project="MyProject" --device-pool="MyPool" --upnp  # Will automatically set port forwarding from a public ip
 ```
 
 ```bash
-user@mycomputer$ adbproxy device-farm --project="MyProject" --device-pool="MyPool" --ngrok  # Will automatically use ngrok as  a gateway
+user@mycomputer$ adbproxy devicefarm --project="MyProject" --device-pool="MyPool" --ngrok  # Will automatically use ngrok as  a gateway
 ```
 
 ## Iteractive session with `scrcpy`
