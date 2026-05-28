@@ -50,7 +50,7 @@ def ssh_uri(sockaddr, hide_pwd: bool = True):
     ret += sockaddr.get("host")
 
     if sockaddr.get("port") is not None:
-        ret += f":{sockaddr.get("port")}"
+        ret += f":{sockaddr.get('port')}"
 
     return ret
 
