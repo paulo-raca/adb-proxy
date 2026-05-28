@@ -1,5 +1,5 @@
 import asyncio
-import random
+import secrets
 import string
 from urllib.parse import urlparse
 
@@ -55,4 +55,4 @@ def ssh_uri(sockaddr, hide_pwd: bool = True):
 
 
 def random_str(size=6, chars=string.ascii_uppercase + string.ascii_lowercase + string.digits):
-    return "".join(random.choice(chars) for x in range(size))
+    return "".join(secrets.choice(chars) for x in range(size))
