@@ -27,7 +27,6 @@ from ipaddress import IPv4Address
 
 import asyncssh
 
-from .adb_channel import device_path, list_adb_devices, open_stream, read_stream
 from .endpoint import Endpoint
 from .util import hostport, ssh_uri
 
@@ -35,6 +34,10 @@ from .util import hostport, ssh_uri
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("adb-proxy")
 logger.setLevel(logging.INFO)
+
+
+def device_path(device_id: str) -> str:
+    return f"host:transport:{device_id}"
 
 
 class AdbProxyChannel:
@@ -145,10 +148,10 @@ class AdbProxy:
         self.next_local_id = 1
 
     async def open_stream(self, *name):
-        return await open_stream(self.device_endpoint, device_path(self.device_id), *name)
+        return await self.device_endpoint.open_stream(device_path(self.device_id), *name)
 
     async def read_stream(self, *name):
-        return await read_stream(self.device_endpoint, device_path(self.device_id), *name)
+        return await self.device_endpoint.read_stream(device_path(self.device_id), *name)
 
     async def send_cmd(self, cmd, arg0, arg1, data=b""):
         """Send a command to the local ADB Server"""
@@ -355,7 +358,7 @@ class AdbProxy:
 
     @staticmethod
     async def attach_raw(local_endpoint, remote_endpoint, device_id, reverse_connection_supported, wait_for=None):
-        devices = await list_adb_devices(remote_endpoint)
+        devices = await remote_endpoint.devices()
         if device_id is None:
             if len(devices) == 1:
                 device_id = devices[0]
@@ -367,9 +370,7 @@ class AdbProxy:
             raise Exception(f"device '{device_id}' not found")
 
         # Fetch device name -- also acts as a quick test that the device is valid
-        device_name = (
-            (await read_stream(remote_endpoint, device_path(device_id), "shell:getprop ro.product.model")).decode("utf-8").strip()
-        )
+        device_name = (await remote_endpoint.read_stream(device_path(device_id), "shell:getprop ro.product.model")).decode("utf-8").strip()
 
         proxy_task = [None]
 
@@ -383,7 +384,7 @@ class AdbProxy:
         try:
             addr = hostport(server_addr)
             # Execute "adb connect <host>"
-            await read_stream(local_endpoint, f"host:connect:{addr}")
+            await local_endpoint.read_stream(f"host:connect:{addr}")
         finally:
             server.close()
 
@@ -391,7 +392,7 @@ class AdbProxy:
             if proxy_task[0]:
 
                 async def check_device_alive():
-                    await read_stream(remote_endpoint, device_path(device_id), "shell:cat -")
+                    await remote_endpoint.read_stream(device_path(device_id), "shell:cat -")
                     raise EOFError(f"Disconnected from the device {device_id} @ {remote_endpoint.local_hostname} ({device_name})")
 
                 wait_tasks = {proxy_task[0], asyncio.create_task(check_device_alive())}
@@ -410,7 +411,7 @@ class AdbProxy:
         finally:
             try:
                 # Execute "adb disconnect <host>"
-                await read_stream(local_endpoint, f"host:disconnect:{addr}")
+                await local_endpoint.read_stream(f"host:disconnect:{addr}")
             except Exception:
                 pass
 
