@@ -114,8 +114,8 @@ def main() -> None:
             "devicefarm", parents=[listen_reverse_base_parser], help="Awaits connections from DeviceFarm"
         )
         parser_devicefarm.add_argument("--project", dest="project_name", default="adbproxy", help="Project Name")
-        parser_devicefarm_group = parser_devicefarm.add_mutually_exclusive_group()
-        parser_devicefarm_group.add_argument("--device-pool", dest="device_pool", default="Default Pool", help="Device Pool")
+        parser_devicefarm_group = parser_devicefarm.add_mutually_exclusive_group(required=True)
+        parser_devicefarm_group.add_argument("--device-pool", dest="device_pool", help="Device Pool")
         parser_devicefarm_group.add_argument("--device", dest="device_ids", action="append", help="Device ID, ARN, Name or instance ID")
         parser_devicefarm.set_defaults(func=devicefarm)
     except ModuleNotFoundError:

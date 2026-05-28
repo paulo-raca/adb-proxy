@@ -27,6 +27,7 @@ dev = [
     { name = "pre-commit" },
     { name = "ruff" },
     { name = "ty" },
+    { name = "types-aiobotocore-devicefarm" },
 ]
 
 [package.metadata]
@@ -46,6 +47,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4" },
     { name = "ruff", specifier = ">=0.15" },
     { name = "ty", specifier = ">=0.0.40" },
+    { name = "types-aiobotocore-devicefarm" },
 ]
 
 [[package]]
@@ -1126,6 +1128,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ac/e8/20193069d32787f3e1a6ec8940aaa3759d3de8f48f9281bcc0c5cb0939da/ty-0.0.40-py3-none-win32.whl", hash = "sha256:75feb115b3587824c5bdf8f8305e9547b0d1e398e3077b0addc7a1988ea9bb50", size = 10670731, upload-time = "2026-05-27T17:55:31.316Z" },
     { url = "https://files.pythonhosted.org/packages/a3/f9/8b2aa4da61db81322d4a2f9db227afeb48110ca15ae31d380f64c64ceb63/ty-0.0.40-py3-none-win_amd64.whl", hash = "sha256:b0f905edaad788bd61f779a85801b60a267a25ed57fca05aaddd168d9d8896be", size = 11766211, upload-time = "2026-05-27T17:55:51.898Z" },
     { url = "https://files.pythonhosted.org/packages/04/87/369056ed46f1b235130ec0595393262f9cd2061ca3dab276d490980f9343/ty-0.0.40-py3-none-win_arm64.whl", hash = "sha256:07da2b09d9130e2c9a257d2a29beb53105835b0256ee5fdb288fe1aab83fee47", size = 11117369, upload-time = "2026-05-27T17:55:39.329Z" },
+]
+
+[[package]]
+name = "types-aiobotocore-devicefarm"
+version = "3.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "python_full_version < '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6f/8d/598eaa3f69db7bcc9d085da1ab217fcfd3330b9bacf3d91816eb7d3301ef/types_aiobotocore_devicefarm-3.7.0.tar.gz", hash = "sha256:aec8813cbe891baf01be11317f47c2b0ae41235cc66a3900c79c923b2dc90767", size = 41616, upload-time = "2026-05-10T03:12:36.991Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7f/04/773e6c03266140a3940381542430c3ada1f9abba83738c8de8d316e7bec6/types_aiobotocore_devicefarm-3.7.0-py3-none-any.whl", hash = "sha256:e7ad568e1362206f7702ab54d502be66dc3cf0910f7be5468ec980edd12a8cee", size = 48252, upload-time = "2026-05-10T03:12:34.834Z" },
 ]
 
 [[package]]
