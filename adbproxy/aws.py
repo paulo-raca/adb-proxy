@@ -186,12 +186,12 @@ async def run(project_name, device_ids, device_pool, ssh_path):
 
             test_spec = {
                 "version": 0.1,
+                "android_test_host": "amazon_linux_2",
                 "phases": {
                     "install": {
                         "commands": [
-                            # "wget -q http://cs-mobile-sample-apks-shared.s3-us-west-1.amazonaws.com/aws-tools/python3.6-prebuilt.tar.gz",
-                            # "tar -xf python3.6-prebuilt.tar.gz",  # Executable at "$PWD/python3.6-prebuilt/bin/python3"
-                            "virtualenv3 $(pwd)/env3",
+                            "devicefarm-cli use python 3.10",
+                            "python -m venv env3",
                             ". env3/bin/activate",
                             "python -V",
                             "python -m pip install git+https://github.com/paulo-raca/adb-proxy.git",
