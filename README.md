@@ -1,5 +1,11 @@
 # ADB Proxy
 
+> Use an Android device attached to any machine as if it were plugged into your own.
+
+<p align="center">
+  <img src="docs/hero.svg" alt="ADB Proxy" width="100%">
+</p>
+
 
 ## Quick intro
 
