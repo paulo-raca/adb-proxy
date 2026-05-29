@@ -1,5 +1,6 @@
 import asyncio
 import fcntl
+import logging
 import os
 import socket
 import termios
@@ -10,6 +11,9 @@ from typing import Any, Awaitable, Callable, Protocol, TypeAlias
 
 import asyncssh
 from asyncssh import SSHClientConnection
+
+
+logger = logging.getLogger("adb-proxy")
 
 
 class StreamReader(Protocol):
@@ -44,6 +48,15 @@ async def spawn(
     cmd = command or os.environ.get("SHELL", "/bin/sh")
     loop = asyncio.get_running_loop()
 
+    if pty:
+        try:
+            master_fd, slave_fd = openpty()
+        except OSError as e:
+            # Restricted containers (e.g. AWS Device Farm) can exhaust the PTY namespace.
+            # Fall back to pipe mode so basic commands still work.
+            logger.warning(f"PTY allocation failed ({e}); falling back to pipe mode")
+            pty = False
+
     if not pty:
         proc = await asyncio.create_subprocess_shell(
             cmd,
@@ -54,8 +67,6 @@ async def spawn(
         )
         assert proc.stdout is not None and proc.stdin is not None
         return proc.stdout, proc.stdin, loop.create_task(proc.wait())
-
-    master_fd, slave_fd = openpty()
     # Hold a second slave reference in the parent so the master never observes
     # "no slave open" (which on Linux turns master reads into EIO and can lose
     # the buffered subprocess output). We close it once the subprocess exits.
