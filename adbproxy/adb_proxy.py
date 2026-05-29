@@ -193,7 +193,7 @@ class AdbProxy:
         return header_blob[:4], arg0, arg1, data
 
     async def reverse_create(self, remote: str, local: str, local_id: int, remote_id: int) -> None:
-        async def on_connected(r, w):
+        async def on_connected(r: StreamReader, w: StreamWriter) -> None:
             logger.info(f"Received a reverse connection: {tunnel_desc}")
 
             stream_id = self.next_local_id
@@ -393,7 +393,7 @@ class AdbProxy:
 
         # Fetch product identification props in one shot — they populate the CNXN banner
         # so `adb devices -l` shows model/name/device instead of just the proxy's ip:port.
-        async def _getprop(prop):
+        async def _getprop(prop: str) -> str:
             return (await remote_endpoint.read_stream(device_path(device_id), f"shell:getprop {prop}")).decode("utf-8").strip()
 
         prod_name, prod_model, prod_device = await asyncio.gather(
@@ -409,7 +409,7 @@ class AdbProxy:
 
         proxy_task = [None]
 
-        async def on_connected(r, w):
+        async def on_connected(r: StreamReader, w: StreamWriter) -> None:
             logger.info(f"Connected to ADB server {hostport(local_endpoint.adb_sockaddr)} @ {local_endpoint.local_hostname}")
             proxy_task[0] = asyncio.create_task(
                 AdbProxy(
@@ -434,7 +434,7 @@ class AdbProxy:
         try:
             if proxy_task[0]:
 
-                async def check_device_alive():
+                async def check_device_alive() -> None:
                     await remote_endpoint.read_stream(device_path(device_id), "shell:cat -")
                     raise EOFError(f"Disconnected from the device {device_id} @ {remote_endpoint.local_hostname} ({prod_model})")
 
@@ -525,16 +525,16 @@ async def listen_reverse(
     listen_address.setdefault("known_hosts", None)
 
     class MySSHClient(asyncssh.SSHClient):
-        def connection_made(self, conn):
+        def connection_made(self, conn: asyncssh.SSHClientConnection) -> None:
             self.conn = conn
 
-        def auth_banner_received(self, msg, lang):
+        def auth_banner_received(self, msg: str, lang: str) -> None:
             self.conn.set_extra_info(attach_opts=json.loads(msg))
 
-    connections = set()
+    connections: set[asyncio.Task[None]] = set()
 
-    async def on_connected(ssh_client):
-        async def connect_task():
+    async def on_connected(ssh_client: asyncssh.SSHClientConnection) -> None:
+        async def connect_task() -> None:
             attach_opts = ssh_client.get_extra_info("attach_opts")
             async with ssh_client:
                 await connect(ssh_client=ssh_client, **kwargs, **attach_opts)
@@ -598,7 +598,7 @@ async def listen_reverse(
                     except Exception:
                         logger.warning("Cannot get server's real IP")
 
-            async def wait_until_complete():
+            async def wait_until_complete() -> None:
                 logger.info(f"Listening for reverse connections: {ssh_uri(socket_addr)}")
                 if wait_for:
                     await wait_for(socket_addr, ssh_client=ssh_client)
@@ -630,10 +630,10 @@ async def connect_reverse(*, server_address: dict[str, Any], ssh_client: SSHClie
     server_address.setdefault("password", None)
 
     class MySSHServer(asyncssh.SSHServer):
-        def connection_made(self, conn):
+        def connection_made(self, conn: asyncssh.SSHServerConnection) -> None:
             conn.send_auth_banner(json.dumps(kwargs))
 
-        def begin_auth(self, username):
+        def begin_auth(self, username: str) -> bool:
             if username != server_address["username"]:
                 logger.warning(f"Authenticating with {username}: Denied")
                 return True
@@ -642,7 +642,7 @@ async def connect_reverse(*, server_address: dict[str, Any], ssh_client: SSHClie
                 return True
             else:
                 logger.info(f"Authenticating with {username}: Accepted")
-                return
+                return False
 
         def password_auth_supported(self) -> bool:
             return server_address["password"] is not None
@@ -655,11 +655,11 @@ async def connect_reverse(*, server_address: dict[str, Any], ssh_client: SSHClie
                 logger.warning(f"Authenticating with {username}/***: Denied")
                 return False
 
-        def server_requested(self, listen_host, listen_port):
+        def server_requested(self, listen_host: str, listen_port: int) -> bool:
             logger.info(f"Creating tunnel from {listen_host}:{listen_port}")
             return True
 
-        def connection_requested(self, dest_host, dest_port, orig_host, orig_port):
+        def connection_requested(self, dest_host: str, dest_port: int, orig_host: str, orig_port: int) -> bool:
             logger.info(f"Incoming connection to {dest_host}:{dest_port}")
             return True
 
