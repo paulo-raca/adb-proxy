@@ -45,7 +45,10 @@ async def spawn(
     env; a dict replaces it entirely. Callers that want "inherit + override" should
     pass `{**os.environ, **delta}` themselves.
     """
-    cmd = command or os.environ.get("SHELL", "/bin/sh")
+    # For the no-command (interactive shell) case, force -i so the shell prints a prompt
+    # even when there's no PTY (e.g. the openpty fallback below, or pty=False on purpose).
+    # With a PTY bash auto-detects interactive mode; -i is harmlessly redundant there.
+    cmd = command or (os.environ.get("SHELL", "/bin/sh") + " -i")
     loop = asyncio.get_running_loop()
 
     if pty:
