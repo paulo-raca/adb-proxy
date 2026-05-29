@@ -1,0 +1,732 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="100 300 1110 240"
+  width="1110"
+  height="240"
+  font-family="'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif"
+>
+  <defs>
+    <linearGradient id="hubGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c5ce0" />
+      <stop offset="1" stop-color="#3d8ee6" />
+    </linearGradient>
+    <linearGradient id="phoneGreen" x1="0" y1="0" x2="0.7" y2="1">
+      <stop offset="0" stop-color="#2cb574" />
+      <stop offset="1" stop-color="#e9f9f0" />
+    </linearGradient>
+    <linearGradient id="laptopScreen" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#eef3fb" />
+      <stop offset="1" stop-color="#fcfdff" />
+    </linearGradient>
+    <linearGradient id="baseGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a3646" />
+      <stop offset="1" stop-color="#211f29" />
+    </linearGradient>
+    <radialGradient id="hubGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8c6cf0" stop-opacity="0.55" />
+      <stop offset="0.68" stop-color="#8c6cf0" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="phoneGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2cb574" stop-opacity="0.32" />
+      <stop offset="0.7" stop-color="#2cb574" stop-opacity="0" />
+    </radialGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3" result="b" />
+      <feMerge>
+        <feMergeNode in="b" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="softShadow" x="-40%" y="-40%" width="180%" height="200%">
+      <feDropShadow
+        dx="0"
+        dy="14"
+        stdDeviation="14"
+        flood-color="#2a2240"
+        flood-opacity="0.30"
+      />
+    </filter>
+  </defs>
+
+  <!-- ===================== SINGLE CONTINUOUS RAIL (runs behind the devices) ===================== -->
+  <path
+    fill="none"
+    stroke="#9aa0bf"
+    stroke-opacity="0.45"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-dasharray="1.5 9"
+  >
+    <animate
+      attributeName="d"
+      dur="4s"
+      repeatCount="indefinite"
+      values="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488;M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 537 1108 480;M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+    />
+  </path>
+
+  <!-- ===================== USB CABLE (drawn before packets so packets ride OVER it) =====================
+       Rises into the phone with a vertical tangent (control point sits directly
+       below the end point); flexes on the same 4s loop as the phone's float. -->
+  <g>
+    <path
+      fill="none"
+      stroke="#211f29"
+      stroke-width="6.5"
+      stroke-linecap="round"
+    >
+      <animate
+        attributeName="d"
+        dur="4s"
+        repeatCount="indefinite"
+        values="M1044 447 C1090 447 1108 545 1108 488;M1044 447 C1090 447 1108 537 1108 480;M1044 447 C1090 447 1108 545 1108 488"
+      />
+    </path>
+    <path
+      fill="none"
+      stroke="#5a5663"
+      stroke-width="2.4"
+      stroke-linecap="round"
+    >
+      <animate
+        attributeName="d"
+        dur="4s"
+        repeatCount="indefinite"
+        values="M1044 447 C1090 447 1108 545 1108 488;M1044 447 C1090 447 1108 537 1108 480;M1044 447 C1090 447 1108 545 1108 488"
+      />
+    </path>
+  </g>
+
+  <!-- ===================== PACKETS (behind the devices) =====================
+       Many small/fast packets layered under a few large/slow ones.
+       Green travels right, coral travels left (keyPoints="1;0" reverses). -->
+  <!-- small, fast -->
+  <g fill="#2cb574" filter="url(#glow)">
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="0.000s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-0.600s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-1.200s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-1.800s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-2.400s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-3.000s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-3.600s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-4.200s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-4.800s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-5.400s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+  </g>
+  <g fill="#ee7a57" filter="url(#glow)">
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-0.300s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-0.900s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-1.500s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-2.100s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-2.700s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-3.300s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-3.900s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-4.500s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-5.100s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="2.8">
+      <animateMotion
+        dur="6s"
+        begin="-5.700s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+  </g>
+  <!-- a few large, slow -->
+  <g fill="#2cb574" filter="url(#glow)">
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="0.000s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-1.500s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-3.000s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-4.500s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-6.000s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-7.500s"
+        repeatCount="indefinite"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+  </g>
+  <g fill="#ee7a57" filter="url(#glow)">
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-0.750s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-2.250s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-3.750s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-5.250s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-6.750s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+    <circle r="5.5">
+      <animateMotion
+        dur="9s"
+        begin="-8.250s"
+        repeatCount="indefinite"
+        keyPoints="1;0"
+        keyTimes="0;1"
+        calcMode="linear"
+        path="M250 410 C290 382 330 382 370 410 C410 438 450 438 490 410 C530 382 570 382 610 410 C650 438 690 438 730 410 C770 382 810 382 850 410 C890 438 930 438 970 410 C1000 410 1024 447 1044 447 C1090 447 1108 545 1108 488"
+      />
+    </circle>
+  </g>
+
+  <!-- ===================== LAPTOP (your machine) ===================== -->
+  <g filter="url(#softShadow)">
+    <rect x="135" y="335" width="230" height="150" rx="14" fill="#2a2733" />
+    <rect
+      x="144"
+      y="344"
+      width="212"
+      height="132"
+      rx="7"
+      fill="url(#laptopScreen)"
+    />
+    <rect
+      x="123"
+      y="486"
+      width="254"
+      height="13"
+      rx="5"
+      fill="url(#baseGrad)"
+    />
+    <rect x="232" y="486" width="36" height="6" rx="3" fill="#1a1822" />
+  </g>
+  <g opacity="0.5">
+    <animate
+      attributeName="opacity"
+      values="0.32;0.62;0.32"
+      dur="3s"
+      repeatCount="indefinite"
+    />
+    <rect x="228" y="356" width="44" height="86" rx="10" fill="#2a2733" />
+    <rect
+      x="231"
+      y="359"
+      width="38"
+      height="80"
+      rx="7"
+      fill="url(#phoneGreen)"
+    />
+    <rect x="241" y="377" width="18" height="17" rx="8.5" fill="#ffffff" />
+    <circle cx="246" cy="385" r="1.6" fill="#2cb574" />
+    <circle cx="254" cy="385" r="1.6" fill="#2cb574" />
+  </g>
+  <text
+    x="250"
+    y="464"
+    font-size="9"
+    text-anchor="middle"
+    fill="#2cb574"
+    font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+  >
+    device attached &#10003;
+  </text>
+  <text
+    x="250"
+    y="517"
+    font-size="12.5"
+    text-anchor="middle"
+    fill="#635d6c"
+    font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+  >
+    your machine
+  </text>
+
+  <!-- ===================== PROXY HUB ===================== -->
+  <circle cx="640" cy="410" r="90" fill="url(#hubGlow)">
+    <animate
+      attributeName="opacity"
+      values="0.55;1;0.55"
+      dur="3.5s"
+      repeatCount="indefinite"
+    />
+  </circle>
+  <g>
+    <animateTransform
+      attributeName="transform"
+      type="rotate"
+      from="0 640 410"
+      to="360 640 410"
+      dur="16s"
+      repeatCount="indefinite"
+    />
+    <circle
+      cx="640"
+      cy="410"
+      r="71"
+      fill="none"
+      stroke="#7c5ce0"
+      stroke-opacity="0.5"
+      stroke-width="2"
+      stroke-dasharray="6 9"
+    />
+  </g>
+  <g filter="url(#softShadow)">
+    <circle cx="640" cy="410" r="64" fill="url(#hubGrad)" />
+  </g>
+  <circle
+    cx="640"
+    cy="410"
+    r="64"
+    fill="none"
+    stroke="#ffffff"
+    stroke-opacity="0.25"
+    stroke-width="1.5"
+  />
+  <text
+    x="640"
+    y="404"
+    font-size="20"
+    font-weight="700"
+    text-anchor="middle"
+    fill="#ffffff"
+    letter-spacing="-0.3"
+  >
+    ADB
+  </text>
+  <text
+    x="640"
+    y="428"
+    font-size="20"
+    font-weight="700"
+    text-anchor="middle"
+    fill="#ffffff"
+    letter-spacing="-0.3"
+  >
+    Proxy
+  </text>
+  <text
+    x="640"
+    y="517"
+    font-size="12.5"
+    text-anchor="middle"
+    fill="#635d6c"
+    font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+  >
+    ssh &#183; reverse &#183; upnp &#183; ngrok
+  </text>
+
+  <!-- ===================== REMOTE SERVER ===================== -->
+  <g filter="url(#softShadow)">
+    <rect x="922" y="341" width="116" height="137" rx="16" fill="#2e2b37" />
+  </g>
+  <g font-family="ui-monospace, monospace">
+    <rect x="934" y="353" width="92" height="33" rx="7" fill="#1c1a24" />
+    <circle cx="950" cy="369.5" r="4.5" fill="#ee7a57" filter="url(#glow)">
+      <animate
+        attributeName="opacity"
+        values="1;0.2;1"
+        dur="1.6s"
+        repeatCount="indefinite"
+      />
+    </circle>
+    <rect
+      x="962"
+      y="367.5"
+      width="42"
+      height="4"
+      rx="2"
+      fill="#ffffff"
+      opacity="0.14"
+    />
+    <rect
+      x="1008"
+      y="367.5"
+      width="12"
+      height="4"
+      rx="2"
+      fill="#ffffff"
+      opacity="0.24"
+    />
+    <rect x="934" y="393" width="92" height="33" rx="7" fill="#1c1a24" />
+    <circle cx="950" cy="409.5" r="4.5" fill="#e6b34a" filter="url(#glow)">
+      <animate
+        attributeName="opacity"
+        values="1;0.2;1"
+        dur="1.9s"
+        begin="0.3s"
+        repeatCount="indefinite"
+      />
+    </circle>
+    <rect
+      x="962"
+      y="407.5"
+      width="42"
+      height="4"
+      rx="2"
+      fill="#ffffff"
+      opacity="0.14"
+    />
+    <rect
+      x="1008"
+      y="407.5"
+      width="12"
+      height="4"
+      rx="2"
+      fill="#ffffff"
+      opacity="0.24"
+    />
+    <rect x="934" y="433" width="92" height="33" rx="7" fill="#1c1a24" />
+    <circle cx="950" cy="449.5" r="4.5" fill="#34b3bf" filter="url(#glow)">
+      <animate
+        attributeName="opacity"
+        values="1;0.2;1"
+        dur="2.2s"
+        begin="0.6s"
+        repeatCount="indefinite"
+      />
+    </circle>
+    <rect
+      x="962"
+      y="447.5"
+      width="42"
+      height="4"
+      rx="2"
+      fill="#ffffff"
+      opacity="0.14"
+    />
+    <rect
+      x="1008"
+      y="447.5"
+      width="12"
+      height="4"
+      rx="2"
+      fill="#ffffff"
+      opacity="0.24"
+    />
+  </g>
+  <!-- host-side USB plug: metal connector tucked into the server's right edge + cable boot -->
+  <rect x="1044" y="442.5" width="8.5" height="10" rx="3" fill="#2a2733" />
+  <rect x="1032" y="442" width="14" height="11" rx="2.5" fill="#6f6b7a" />
+  <rect x="1034" y="444" width="8" height="2.5" rx="1.25" fill="#9a96a8" />
+  <text
+    x="980"
+    y="517"
+    font-size="12.5"
+    text-anchor="middle"
+    fill="#635d6c"
+    font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+  >
+    remote machine
+  </text>
+
+  <!-- ===================== REAL DEVICE ===================== -->
+  <ellipse cx="1108" cy="408" rx="92" ry="92" fill="url(#phoneGlow)" />
+  <g>
+    <animateTransform
+      attributeName="transform"
+      type="translate"
+      values="0 0;0 -8;0 0"
+      dur="4s"
+      repeatCount="indefinite"
+    />
+    <!-- USB-C plug into the phone (tip tucks under the body, boot sticks out the bottom) -->
+    <rect x="1102.5" y="483" width="11" height="10" rx="3.5" fill="#2a2733" />
+    <rect x="1101" y="472" width="14" height="13" rx="2.5" fill="#6f6b7a" />
+    <rect x="1103.5" y="474" width="9" height="2.5" rx="1.25" fill="#9a96a8" />
+    <g filter="url(#softShadow)">
+      <rect x="1075" y="341" width="66" height="135" rx="16" fill="#2a2733" />
+      <rect
+        x="1080"
+        y="346"
+        width="56"
+        height="125"
+        rx="11"
+        fill="url(#phoneGreen)"
+      />
+    </g>
+    <rect
+      x="1097"
+      y="352"
+      width="22"
+      height="6"
+      rx="3"
+      fill="#1a1822"
+      fill-opacity="0.85"
+    />
+    <rect x="1094" y="386" width="28" height="26" rx="13" fill="#ffffff" />
+    <circle cx="1102" cy="398" r="2.4" fill="#2cb574" />
+    <circle cx="1114" cy="398" r="2.4" fill="#2cb574" />
+    <circle cx="1098" cy="428" r="3" fill="#ffffff" opacity="0.9">
+      <animate
+        attributeName="opacity"
+        values="1;0.15;1"
+        dur="1.4s"
+        repeatCount="indefinite"
+      />
+    </circle>
+    <circle cx="1108" cy="428" r="3" fill="#ffffff" opacity="0.9">
+      <animate
+        attributeName="opacity"
+        values="1;0.15;1"
+        dur="1.4s"
+        begin="0.2s"
+        repeatCount="indefinite"
+      />
+    </circle>
+    <circle cx="1118" cy="428" r="3" fill="#ffffff" opacity="0.9">
+      <animate
+        attributeName="opacity"
+        values="1;0.15;1"
+        dur="1.4s"
+        begin="0.4s"
+        repeatCount="indefinite"
+      />
+    </circle>
+  </g>
+  <text
+    x="1108"
+    y="517"
+    font-size="12.5"
+    text-anchor="middle"
+    fill="#635d6c"
+    font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+  >
+    device
+  </text>
+</svg>
