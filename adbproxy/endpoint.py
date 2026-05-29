@@ -1,11 +1,19 @@
 import asyncio
+import fcntl
+import logging
 import os
 import socket
+import termios
 from abc import ABC, abstractmethod
+from asyncio.streams import FlowControlMixin
+from pty import openpty
 from typing import Any, Awaitable, Callable, Protocol, TypeAlias
 
 import asyncssh
 from asyncssh import SSHClientConnection
+
+
+logger = logging.getLogger("adb-proxy")
 
 
 class StreamReader(Protocol):
@@ -19,7 +27,100 @@ class StreamWriter(Protocol):
     def close(self) -> None: ...
 
 
+async def spawn(
+    command: str | None,
+    *,
+    pty: bool = True,
+    env: dict[str, str] | None = None,
+) -> tuple[asyncio.StreamReader, asyncio.StreamWriter, asyncio.Future[int]]:
+    """Spawn `command` (or $SHELL) and return (stdout, stdin, exitcode_future).
+
+    With pty=True (default), allocates a real PTY pair and gives the slave to the
+    subprocess (with setsid + TIOCSCTTY in preexec_fn). bash sees a TTY → interactive
+    mode → prompts, colors, line editing, job control.
+
+    With pty=False, falls back to pipe-based I/O.
+
+    `env` follows standard subprocess semantics: None inherits the parent process
+    env; a dict replaces it entirely. Callers that want "inherit + override" should
+    pass `{**os.environ, **delta}` themselves.
+    """
+    cmd = command or os.environ.get("SHELL", "/bin/sh")
+    loop = asyncio.get_running_loop()
+
+    if pty:
+        try:
+            master_fd, slave_fd = openpty()
+        except OSError as e:
+            # Restricted containers (e.g. AWS Device Farm) can exhaust the PTY namespace.
+            # Fall back to pipe mode so basic commands still work.
+            logger.warning(f"PTY allocation failed ({e}); falling back to pipe mode")
+            pty = False
+
+    if not pty:
+        proc = await asyncio.create_subprocess_shell(
+            cmd,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=env,
+        )
+        assert proc.stdout is not None and proc.stdin is not None
+        return proc.stdout, proc.stdin, loop.create_task(proc.wait())
+    # Hold a second slave reference in the parent so the master never observes
+    # "no slave open" (which on Linux turns master reads into EIO and can lose
+    # the buffered subprocess output). We close it once the subprocess exits.
+    parent_slave_fd = os.dup(slave_fd)
+
+    def _make_controlling_terminal() -> None:
+        # Make slave_fd the controlling terminal so bash gets job control.
+        os.setsid()
+        fcntl.ioctl(slave_fd, termios.TIOCSCTTY, 0)
+
+    try:
+        proc = await asyncio.create_subprocess_shell(
+            cmd,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            preexec_fn=_make_controlling_terminal,
+            env=env,
+        )
+    finally:
+        os.close(slave_fd)
+
+    # The read side owns master_fd; the writer uses a dup so the two halves
+    # can be closed independently.
+    reader = asyncio.StreamReader()
+    await loop.connect_read_pipe(
+        lambda: asyncio.StreamReaderProtocol(reader),
+        os.fdopen(master_fd, "rb", buffering=0),
+    )
+    write_transport, write_protocol = await loop.connect_write_pipe(
+        FlowControlMixin,
+        os.fdopen(os.dup(master_fd), "wb", buffering=0),
+    )
+    writer = asyncio.StreamWriter(write_transport, write_protocol, reader, loop)
+
+    async def _wait_and_release_slave() -> int:
+        rc = await proc.wait()
+        os.close(parent_slave_fd)  # now master will see clean EOF after the buffer drains
+        return rc
+
+    return reader, writer, loop.create_task(_wait_and_release_slave())
+
+
 ConnectedCallback: TypeAlias = Callable[[StreamReader, StreamWriter], Awaitable[Any]]
+
+
+# Env vars injected into a hostshell so the user can tell at a glance that the
+# prompt they see is the adbproxy's local shell. The PROMPT_COMMAND captures the
+# original PS1 once and re-applies the prefix on every prompt — survives bash
+# overriding PS1 from .bashrc, and never stacks "[adbproxy] [adbproxy] ...".
+_HOSTSHELL_ENV: dict[str, str] = {
+    "PS1": r"[adbproxy] \u@\h:\w\$ ",
+    "PROMPT_COMMAND": r'_orig_ps1=${_orig_ps1-$PS1}; PS1="[adbproxy] $_orig_ps1"',
+}
 
 
 class Endpoint(ABC):
@@ -133,6 +234,7 @@ class SshEndpoint(Endpoint):
             stderr=asyncssh.STDOUT,
             encoding=None,
             term_type="xterm-color" if pty else None,
+            env=_HOSTSHELL_ENV,
         )
         return proc.stdout, proc.stdin
 
@@ -149,13 +251,5 @@ class LocalEndpoint(Endpoint):
         return server, server.sockets[0].getsockname()
 
     async def shell(self, command: str | None, *, pty: bool = True) -> tuple[StreamReader, StreamWriter]:
-        # TODO: Support PTY
-        proc = await asyncio.create_subprocess_shell(
-            command or os.environ.get("SHELL", "/bin/sh"),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            encoding=None,
-        )
-        assert proc.stdout is not None and proc.stdin is not None
-        return proc.stdout, proc.stdin
+        reader, writer, _exitcode = await spawn(command, pty=pty, env={**os.environ, **_HOSTSHELL_ENV})
+        return reader, writer
