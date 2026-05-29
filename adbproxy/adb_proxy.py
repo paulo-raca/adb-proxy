@@ -631,7 +631,7 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
         kill the subprocess.
         """
         pty = bool(process.get_terminal_type())
-        logger.info(f"hostshell session: command={process.command!r}, pty={pty}")
+        logger.info(f"shell session: command={process.command!r}, pty={pty}")
         try:
             reader, writer, exitcode = await spawn(
                 process.command,
@@ -656,7 +656,7 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
                     writer.write(data)
                     await writer.drain()
             except Exception as e:
-                logger.warning(f"hostshell stdin pump exception: {type(e).__name__}: {e}")
+                logger.warning(f"shell stdin pump exception: {type(e).__name__}: {e}")
 
         async def stdout_pump() -> None:
             try:
@@ -667,7 +667,7 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
                     process.stdout.write(data)
                     await process.stdout.drain()
             except Exception as e:
-                logger.warning(f"hostshell stdout pump exception: {type(e).__name__}: {e}")
+                logger.warning(f"shell stdout pump exception: {type(e).__name__}: {e}")
             finally:
                 process.stdout.close()
 
@@ -676,7 +676,7 @@ async def connect_reverse(server_address, ssh_client=None, **kwargs):
 
         rc = await exitcode
         writer.close()
-        logger.info(f"hostshell session exited with code {rc}")
+        logger.info(f"shell session exited with code {rc}")
         process.exit(rc)
 
     server_host_key = asyncssh.generate_private_key("ecdsa-sha2-nistp256")
