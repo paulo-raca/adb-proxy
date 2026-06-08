@@ -7,7 +7,7 @@ authors = [{ name = "Paulo Costa" }]
 requires-python = ">=3.10"
 dependencies = [
     "argcomplete>=3.1.1",
-    "asyncssh>=2.19.0",
+    "asyncssh>=2.23.1",
     "PyYAML>=6.0",
 ]
 
