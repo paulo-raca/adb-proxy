@@ -7,7 +7,7 @@ authors = [{ name = "Paulo Costa" }]
 requires-python = ">=3.10"
 dependencies = [
     "argcomplete>=3.1.1",
-    "asyncssh>=2.23.1",
+    "asyncssh>=2.24.0",
     "PyYAML>=6.0",
 ]
 
@@ -27,7 +27,7 @@ adbproxy = "adbproxy:main"
 [dependency-groups]
 dev = [
     "ruff>=0.15.20",
-    "ty>=0.0.54",
+    "ty>=0.0.55",
     "pre-commit>=4",
     "types-aiobotocore-devicefarm",
 ]
