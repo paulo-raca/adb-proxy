@@ -13,7 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 devicefarm = [
-    "aiobotocore>=2.5.0",
+    "aiobotocore>=3.8.0",
     "botocore[crt]",
     "httpx>=0.25",
 ]
@@ -26,8 +26,8 @@ adbproxy = "adbproxy:main"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.20",
-    "ty>=0.0.55",
+    "ruff>=0.15.22",
+    "ty>=0.0.60",
     "pre-commit>=4",
     "types-aiobotocore-devicefarm",
 ]
