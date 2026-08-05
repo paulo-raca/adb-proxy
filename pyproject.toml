@@ -13,7 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 devicefarm = [
-    "aiobotocore>=3.8.0",
+    "aiobotocore>=3.9.0",
     "botocore[crt]",
     "httpx>=0.25",
 ]
