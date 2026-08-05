@@ -32,7 +32,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiobotocore", marker = "extra == 'devicefarm'", specifier = ">=3.8.0" },
+    { name = "aiobotocore", marker = "extra == 'devicefarm'", specifier = ">=3.9.0" },
     { name = "argcomplete", specifier = ">=3.7.0" },
     { name = "async-upnp-client", marker = "extra == 'upnp'", specifier = ">=0.48.0" },
     { name = "asyncssh", specifier = ">=2.24.0" },
@@ -52,7 +52,7 @@ dev = [
 
 [[package]]
 name = "aiobotocore"
-version = "3.8.0"
+version = "3.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -64,9 +64,9 @@ dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '3.11'" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d8/a7/bc31b7046c610471f0630819ca5d2a57ac4efa8d47135cb53e43f2785390/aiobotocore-3.8.0.tar.gz", hash = "sha256:80a1eb64ea915f3af3c1518669975bae74a17b2f37c14eb0fa2f83b915974670", size = 131368, upload-time = "2026-07-17T03:10:30.258Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/c0/18abcb7e4e504a68714c280853fd180afe376a4a55e5511fb04ba76702e4/aiobotocore-3.9.0.tar.gz", hash = "sha256:5d344e97c518b010bea167c7f7ba4f9e785f9d2b8ac7af4fd00846c62f2c0a10", size = 514972, upload-time = "2026-08-01T11:54:07.673Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6d/f4/5a7d76dc844d3ff8ed1f1a043158aa393794aebb787d3e2f8c0fe87f674f/aiobotocore-3.8.0-py3-none-any.whl", hash = "sha256:8bc605132cadfe844a3f334635a0a64fa5e360a4a206e915d99d53db5b6deeba", size = 91169, upload-time = "2026-07-17T03:10:28.771Z" },
+    { url = "https://files.pythonhosted.org/packages/30/c5/6290519dec32f3cdf6827e3bbcbf7a9f4fb29a55a9204199901fed69957b/aiobotocore-3.9.0-py3-none-any.whl", hash = "sha256:7354659eac9ba6034675b3ea178330b7de97c45989d6fda1bf01d3da167b6135", size = 100764, upload-time = "2026-08-01T11:54:06.128Z" },
 ]
 
 [[package]]
@@ -1218,14 +1218,14 @@ wheels = [
 
 [[package]]
 name = "types-aiobotocore-devicefarm"
-version = "3.8.0"
+version = "3.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2d/e0/e0869830b55c48d9017224283727088e183c61249e01b5121a303b31ff1d/types_aiobotocore_devicefarm-3.8.0.tar.gz", hash = "sha256:5ccf059291957a6035d3ff611ddc767c2360e5be9682fa18220494b13bd257f9", size = 41634, upload-time = "2026-07-18T02:43:47.03Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/e9/61b1e0ce6063b647204619cd6de90d890684bd918239a21dc27f59a9f308/types_aiobotocore_devicefarm-3.9.0.tar.gz", hash = "sha256:9d5bf48a64a50477c9fdfbc6d450c6ce1031f7f7b8db7d58a9a2df021bd09066", size = 41634, upload-time = "2026-08-02T02:59:00.655Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/27/3d/9cebb0d6cb7d48da176200120a5cb4d0f0aeeba9a5e00423497dd518843c/types_aiobotocore_devicefarm-3.8.0-py3-none-any.whl", hash = "sha256:fbe3d29ccf46fec473f9afabfd053570a1793363ded0a3fd7e2e11bf4060709f", size = 48284, upload-time = "2026-07-18T02:43:45.167Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/b4/103d545a8b6ab5452a20923ae7fbe2a5e8d9f117be38a593ddcc95230945/types_aiobotocore_devicefarm-3.9.0-py3-none-any.whl", hash = "sha256:f2f3b94c1437738481d031149fc9829e4cb782ab7e66d564da8f685060cf4355", size = 48285, upload-time = "2026-08-02T02:58:58.521Z" },
 ]
 
 [[package]]
