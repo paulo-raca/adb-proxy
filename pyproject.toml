@@ -18,7 +18,7 @@ devicefarm = [
     "httpx>=0.25",
 ]
 upnp = [
-    "async-upnp-client>=0.48.0",
+    "async-upnp-client>=0.48.1",
 ]
 
 [project.scripts]
@@ -26,9 +26,9 @@ adbproxy = "adbproxy:main"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.16.2",
-    "ty>=0.0.69",
-    "pre-commit>=4.6.1",
+    "ruff>=0.16.4",
+    "ty>=0.0.74",
+    "pre-commit>=4.6.2",
     "types-aiobotocore-devicefarm",
 ]
 
