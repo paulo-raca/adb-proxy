@@ -27,7 +27,7 @@ adbproxy = "adbproxy:main"
 [dependency-groups]
 dev = [
     "ruff>=0.16.7",
-    "ty>=0.0.81",
+    "ty>=0.0.84",
     "pre-commit>=4.6.2",
     "types-aiobotocore-devicefarm",
 ]
